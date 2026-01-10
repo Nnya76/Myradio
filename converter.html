@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Profi HTPC M3U Konverter</title>
+    <style>
+        body { background: #121212; color: #00ff00; font-family: 'Consolas', monospace; padding: 30px; }
+        .box { background: #1e1e1e; padding: 25px; border-radius: 12px; border: 1px solid #333; max-width: 900px; margin: auto; }
+        textarea { width: 100%; height: 400px; background: #000; color: #00ff00; border: 1px solid #444; padding: 10px; margin-top: 15px; font-size: 12px; }
+        .controls { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
+        button { background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #218838; }
+        .stats { color: #aaa; margin-top: 10px; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2>HTPC M3U LOGO KONVERTER</h2>
+    <div class="controls">
+        <input type="file" id="fileInput" accept=".m3u,.m3u8">
+        <button onclick="copyToClipboard()">Kész kód másolása</button>
+    </div>
+    
+    <textarea id="result" placeholder="A konvertált kód itt jelenik majd meg..."></textarea>
+    <div id="stats" class="stats">Várj a fájlra...</div>
+</div>
+
+<script>
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const content = e.target.result;
+            const lines = content.split('\n');
+            const stations = [];
+            
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i].trim();
+                
+                if (line.startsWith("#EXTINF:")) {
+                    // Logó kinyerése (tvg-logo="...")
+                    let logoMatch = line.match(/tvg-logo="([^"]+)"/);
+                    let logo = logoMatch ? logoMatch[1] : "";
+                    
+                    // Név kinyerése (az utolsó vesszõ utáni rész)
+                    let name = line.substring(line.lastIndexOf(",") + 1).trim();
+                    
+                    // A következõ nem üres sor lesz az URL
+                    let url = "";
+                    for (let j = i + 1; j < lines.length; j++) {
+                        if (lines[j].trim() !== "" && !lines[j].trim().startsWith("#")) {
+                            url = lines[j].trim();
+                            i = j; // Átugorjuk a feldolgozott URL sort
+                            break;
+                        }
+                    }
+                    
+                    if (url !== "") {
+                        stations.push({
+                            name: name,
+                            logo: logo,
+                            url: url
+                        });
+                    }
+                }
+            }
+
+            const finalCode = "const stations = " + JSON.stringify(stations, null, 4) + ";";
+            document.getElementById('result').value = finalCode;
+            document.getElementById('stats').innerText = `Találatok: ${stations.length} adó feldolgozva.`;
+        };
+        reader.readAsText(file);
+    });
+
+    function copyToClipboard() {
+        const copyText = document.getElementById("result");
+        copyText.select();
+        document.execCommand("copy");
+        alert("Kód a vágólapra másolva!");
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,154 @@
+﻿<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Személyes Idővonal</title>
+    <style>
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .card {
+            background: linear-gradient(145deg, #111, #1a1a1a);
+            border: 1px solid #333;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 25px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        h2 {
+            color: #00d1b2;
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 0;
+        }
+
+        .counter {
+            font-family: 'Courier New', monospace;
+            font-size: 1.4rem;
+            line-height: 1.8;
+            color: #eee;
+        }
+
+        .highlight {
+            color: #00d1b2;
+            font-weight: bold;
+            font-size: 1.8rem;
+        }
+
+        .xmas-theme {
+            border-color: #ff3860;
+        }
+
+        .xmas-theme h2 {
+            color: #ff3860;
+        }
+
+        .xmas-display {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 15px rgba(255, 56, 96, 0.5);
+        }
+
+        .sub-text {
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <h2>Ennyi ideje vagyok nektek:</h2>
+        <div id="age-counter" class="counter">
+            Számítás...
+        </div>
+        <div class="sub-text">Született: 1976. 10. 17. 07:30</div>
+    </div>
+
+    <div class="card xmas-theme">
+        <h2>Karácsonyig hátralévő idő:</h2>
+        <div id="xmas-counter" class="xmas-display">
+            000 nap
+        </div>
+        <div id="xmas-sub" class="counter" style="font-size: 1.2rem; margin-top:10px;">
+            00:00:00
+        </div>
+    </div>
+</div>
+
+<script>
+    function updateCounters() {
+        const now = new Date();
+        const birthDate = new Date(1976, 9, 17, 7, 30, 0); // Október a 9-es index (0-11)
+
+        // 1. Életkor számítás
+        let years = now.getFullYear() - birthDate.getFullYear();
+        let months = now.getMonth() - birthDate.getMonth();
+        let days = now.getDate() - birthDate.getDate();
+        let hours = now.getHours() - birthDate.getHours();
+        let minutes = now.getMinutes() - birthDate.getMinutes();
+        let seconds = now.getSeconds() - birthDate.getSeconds();
+
+        if (seconds < 0) { seconds += 60; minutes--; }
+        if (minutes < 0) { minutes += 60; hours--; }
+        if (hours < 0) { hours += 24; days--; }
+        if (days < 0) {
+            const lastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+            days += lastMonth.getDate();
+            months--;
+        }
+        if (months < 0) { months += 12; years--; }
+
+        document.getElementById('age-counter').innerHTML = `
+            <span class="highlight">${years}</span> éve, ${months}</span> hónap, <span class="highlight">${days}</span> nap<br>
+            ${hours} óra, ${minutes} perc, ${seconds} mp
+        `;
+
+        // 2. Karácsony számítás (2026. dec 24. 00:00)
+        let xmasYear = now.getFullYear();
+        let xmasDate = new Date(xmasYear, 11, 24, 0, 0, 0);
+        
+        // Ha már elmúlt idén a karácsony, a következő évre váltunk
+        if (now > xmasDate) {
+            xmasDate = new Date(xmasYear + 1, 11, 24, 0, 0, 0);
+        }
+
+        const diff = xmasDate - now;
+        const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const s = Math.floor((diff % (1000 * 60)) / 1000);
+
+        document.getElementById('xmas-counter').innerText = `${d} nap`;
+        document.getElementById('xmas-sub').innerText = 
+            `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+
+    // Frissítés másodpercenként
+    setInterval(updateCounters, 1000);
+    updateCounters();
+</script>
+
+</body>
+</html>

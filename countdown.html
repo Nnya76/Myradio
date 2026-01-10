@@ -1,0 +1,145 @@
+﻿<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pro Időzítő - Android 16</title>
+    <style>
+        :root { --bg: #000; --card: #111; --accent: #00d1b2; --text: #fff; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; padding: 10px; display: flex; flex-direction: column; align-items: center; }
+        .container { width: 100%; max-width: 500px; }
+        .timer-card { background: var(--card); border: 1px solid #333; border-radius: 15px; padding: 20px; margin-bottom: 15px; }
+        .timer-header { background: transparent; border: none; border-bottom: 1px solid #444; color: var(--accent); font-size: 1.2rem; width: 100%; text-align: center; margin-bottom: 10px; outline: none; }
+        .display { font-size: 3rem; text-align: center; margin: 10px 0; font-family: monospace; }
+        .input-row { display: flex; justify-content: center; gap: 5px; margin-bottom: 15px; }
+        input[type="number"] { width: 60px; height: 40px; background: #222; border: 1px solid #555; color: #fff; text-align: center; border-radius: 5px; }
+        .controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        button { height: 45px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .btn-start { background: #48c774; }
+        .btn-stop { background: #ffdd57; }
+        .btn-reset { background: #ff3860; color: #fff; }
+        .finished { animation: bg-alert 0.5s infinite; }
+        @keyframes bg-alert { 50% { background: #400; } }
+        .perm-btn { background: #3273dc; color: white; padding: 10px; margin-bottom: 20px; width: 100%; border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+<button class="perm-btn" onclick="requestEverything()">🔔 Értesítések és Hang engedélyezése</button>
+
+<div class="container" id="main-container"></div>
+
+<script>
+    const container = document.getElementById('main-container');
+    const timerCount = 8;
+    let states = {};
+    let wakeLock = null;
+
+    // 1. Engedélyek kérése
+    async function requestEverything() {
+        // Értesítés kérése
+        if ("Notification" in window) {
+            await Notification.requestPermission();
+        }
+        // Hang inicializálása (iOS/Android unlock)
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        ctx.resume();
+        alert("Rendszer készen áll a jelzésre!");
+    }
+
+    // 2. Ébren tartás (Wake Lock)
+    async function acquireWakeLock() {
+        if ('wakeLock' in navigator) {
+            try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
+        }
+    }
+
+    // 3. Hang generátor
+    function playSound() {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = 5000;
+        osc.frequency.value = 4000;
+        gain.gain.value = 0.5;
+        osc.start(); osc.stop(ctx.currentTime + 1.5);
+    }
+
+    // Kártyák generálása
+    for (let i = 1; i <= timerCount; i++) {
+        const div = document.createElement('div');
+        div.className = 'timer-card';
+        div.id = `card-${i}`;
+        div.innerHTML = `
+            <input type="text" id="name-${i}" class="timer-header" value="Időzítő ${i}">
+            <div class="display" id="display-${i}">00:00:00</div>
+            <div class="input-row" id="inputs-${i}">
+                <input type="number" id="h-${i}" value="0">
+                <input type="number" id="m-${i}" value="0">
+                <input type="number" id="s-${i}" value="0">
+            </div>
+            <div class="controls">
+                <button class="btn-start" id="btn-s-${i}" onclick="start(${i})">Start</button>
+                <button class="btn-stop" onclick="stop(${i})">Stop</button>
+                <button class="btn-reset" onclick="reset(${i})">Reset</button>
+            </div>
+        `;
+        container.appendChild(div);
+    }
+
+    window.start = function(id) {
+        acquireWakeLock();
+        if (!states[id]) states[id] = { remaining: 0, interval: null };
+        
+        if (states[id].remaining <= 0) {
+            const h = parseInt(document.getElementById(`h-${id}`).value) || 0;
+            const m = parseInt(document.getElementById(`m-${id}`).value) || 0;
+            const s = parseInt(document.getElementById(`s-${id}`).value) || 0;
+            states[id].remaining = (h * 3600) + (m * 60) + s;
+        }
+
+        if (states[id].remaining <= 0) return;
+        document.getElementById(`inputs-${id}`).style.opacity = "0";
+
+        states[id].interval = setInterval(() => {
+            states[id].remaining--;
+            updateView(id);
+
+            if (states[id].remaining <= 0) {
+                clearInterval(states[id].interval);
+                const name = document.getElementById(`name-${id}`).value;
+                
+                playSound();
+                if (navigator.vibrate) navigator.vibrate([500, 500, 500]);
+                
+                // Értesítés küldése (ez látszik lezárt képernyőn)
+                if (Notification.permission === "granted") {
+                    new Notification("LEJÁRT AZ IDŐ!", { body: name, icon: "https://cdn-icons-png.flaticon.com/512/252/252044.png" });
+                }
+                
+                document.getElementById(`card-${id}`).classList.add('finished');
+            }
+        }, 1000);
+    };
+
+    function updateView(id) {
+        const r = states[id].remaining;
+        const h = Math.floor(r / 3600);
+        const m = Math.floor((r % 3600) / 60);
+        const s = r % 60;
+        document.getElementById(`display-${id}`).innerText = 
+            `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+
+    window.stop = function(id) { clearInterval(states[id]?.interval); };
+    window.reset = function(id) {
+        stop(id);
+        if(states[id]) states[id].remaining = 0;
+        updateView(id);
+        document.getElementById(`inputs-${id}`).style.opacity = "1";
+        document.getElementById(`card-${id}`).classList.remove('finished');
+    };
+</script>
+</body>
+</html>

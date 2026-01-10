@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pinnacle Pronto HEX Generátor</title>
+	<style>
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            padding: 40px; 
+            background: #121212; /* Mélyfekete háttér */
+            color: #e0e0e0;      /* Világosszürke szöveg */
+        }
+        .container { 
+            background: #1e1e1e; /* Sötétszürke kártya */
+            padding: 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
+            max-width: 900px;
+            margin: auto;
+        }
+        textarea { 
+            width: 100%; 
+            height: 500px; 
+            font-family: 'Consolas', monospace; 
+            font-size: 13px; 
+            margin-top: 20px; 
+            background: #2d2d2d; 
+            color: #00ff00;      /* "Mátrix" zöld kódok a jobb olvashatóságért */
+            border: 1px solid #444;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        button { 
+            padding: 12px 24px; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        button:hover { 
+            background: #0056b3; 
+        }
+        h2 { color: #ffffff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Pinnacle PCTV infra kód generátor</h2>
+        <p>Kattints a gombra a kódok elõállításához:</p>
+        <button onclick="generate()">PCTV Kód Generálása</button>
+        <textarea id="output" readonly placeholder="A kódok itt fognak megjelenni..."></textarea>
+    </div>
+
+    <script>
+        function dec2hex(dec, len) {
+            let hex = Number(dec).toString(16).toUpperCase();
+            while (hex.length < len) { hex = "0" + hex; }
+            return hex;
+        }
+
+        function generate() {
+            let result = "";
+            for (let i = 1; i <= 1000; i++) {
+                let var1 = dec2hex(32 + i, 4);
+                let var2 = dec2hex(96 + i, 4);
+                let var3 = dec2hex(129 + i, 4);
+                
+                let code = "CODE_" + i.toString().padStart(3, '0') + ":\n" +
+                    "0000 006C 0006 0006 0040 0101 00C1 0020 0040 0020 0040 " + var1 + 
+                    " 0020 " + var2 + " 0040 21C5 0040 0101 0081 0020 0040 " + var2 + 
+                    " 0040 0020 0020 " + var3 + " 0020 0B63\n\n";
+                result += code;
+            }
+            document.getElementById('output').value = result;
+        }
+    </script>
+</body>
+</html>
