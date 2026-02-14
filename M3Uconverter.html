@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <title>Pro M3U8 Multi-Converter v3.0</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a2e; color: #e2e2e2; margin: 0; padding: 20px; }
+        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .box { background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; }
+        .box.full { grid-column: span 2; }
+        h3 { margin: 0 0 8px 0; color: #4ecca3; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+        textarea { width: 100%; height: 180px; background: #0f3460; color: #fff; border: 1px solid #1a1a2e; border-radius: 4px; padding: 8px; font-family: 'Consolas', monospace; font-size: 11px; resize: none; box-sizing: border-box; }
+        .controls { margin-bottom: 20px; text-align: center; background: #16213e; padding: 15px; border-radius: 8px; border-bottom: 4px solid #4ecca3; }
+        button { background: #4ecca3; border: none; padding: 10px 20px; color: #1a1a2e; font-weight: bold; border-radius: 4px; cursor: pointer; transition: 0.2s; margin: 5px; }
+        button:hover { background: #45b291; transform: scale(1.02); }
+        .copy-btn { background: #3944bc; color: white; margin-top: 8px; padding: 6px; font-size: 11px; border: none; border-radius: 3px; cursor: pointer; }
+        .stats { font-size: 13px; color: #4ecca3; margin-top: 8px; font-weight: bold; }
+        .warn-box { border: 1px solid #e94560 !important; }
+        .warn-h3 { color: #e94560 !important; }
+    </style>
+</head>
+<body>
+
+<div class="controls">
+    <h2>M3U8 Multi-Konverter & Duplikátum Jelölő</h2>
+    <button onclick="processAll()">🚀 FELDOLGOZÁS ÉS ANALÍZIS</button>
+    <div id="statBar" class="stats">Várakozás adatra (max 300.000 sor)...</div>
+</div>
+
+<div class="grid-container">
+    <div class="box full">
+        <h3>1. FORRÁS (Beillesztés)</h3>
+        <textarea id="inputArea" placeholder="#EXTM3U..."></textarea>
+    </div>
+
+    <div class="box">
+        <h3>2. Alap Tisztított (M3U8)</h3>
+        <textarea id="outAlap" readonly></textarea>
+        <button class="copy-btn" onclick="download('outAlap', 'alap.m3u8')">Letöltés</button>
+    </div>
+
+    <div class="box">
+        <h3>3. HTML Formátum (JSON)</h3>
+        <textarea id="outHtml" readonly></textarea>
+        <button class="copy-btn" onclick="copyToClipboard('outHtml')">Másolás</button>
+    </div>
+
+    <div class="box">
+        <h3>4. Csak Webcímek (.txt)</h3>
+        <textarea id="outUrls" readonly></textarea>
+        <button class="copy-btn" onclick="download('outUrls', 'linkek.txt')">Letöltés</button>
+    </div>
+
+    <div class="box">
+        <h3>5. Visszafelé (Tisztított M3U)</h3>
+        <textarea id="outClean" readonly></textarea>
+        <button class="copy-btn" onclick="download('outClean', 'vissza.m3u8')">Letöltés</button>
+    </div>
+
+    <div class="box warn-box">
+        <h3 class="warn-h3">6. JELÖLT LISTA (Duplikátum jelzéssel)</h3>
+        <textarea id="outMarked" readonly></textarea>
+        <button class="copy-btn" style="background:#e94560" onclick="download('outMarked', 'jelolt_lista.m3u8')">Jelölt lista letöltése</button>
+    </div>
+
+    <div class="box">
+        <h3>7. Egyedi Lista (Duplikátumok törölve)</h3>
+        <textarea id="outUnique" readonly></textarea>
+        <button class="copy-btn" onclick="download('outUnique', 'egyedi.m3u8')">Letöltés</button>
+    </div>
+</div>
+
+<script>
+    function normalizeUrl(url) {
+        if(!url) return "";
+        let u = url.trim().toLowerCase();
+        u = u.replace(/^https?:\/\//, ""); 
+        u = u.replace(/[\/,]+$/, "");     
+        return u;
+    }
+
+    function processAll() {
+        const raw = document.getElementById('inputArea').value.trim();
+        if(!raw) return alert("Nincs adat!");
+
+        const lines = raw.split(/\r?\n/);
+        let allItems = [];
+        let currentItem = { title: '', logo: '', url: '', rawInf: '' };
+        
+        let seenUrls = new Set();
+        let uniqueMap = new Map();
+        let markedOutput = "#EXTM3U\n";
+
+        // ELŐFELDOLGOZÁS
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            if (line.startsWith('#EXTINF:')) {
+                currentItem.rawInf = line;
+                let logoMatch = line.match(/tvg-logo="([^"]+)"/);
+                currentItem.logo = logoMatch ? logoMatch[1].replace(/file:\/\/.*[\/\\]/, 'logos/') : '';
+                let titleParts = line.split(',');
+                currentItem.title = titleParts.length > 1 ? titleParts[1].trim() : '';
+            } 
+            else if (line && !line.startsWith('#')) {
+                currentItem.url = line;
+                let norm = normalizeUrl(line);
+                let isDupe = seenUrls.has(norm);
+                
+                // 6. ABLAK LOGIKA (Jelölés)
+                let prefix = isDupe ? "[DUPLIKÁTUM!!!] " : "";
+                let displayTitle = currentItem.title || "[duplikátum]";
+                markedOutput += `#EXTINF:-1,${prefix}${displayTitle}\n${line}\n`;
+
+                // 7. ABLAK LOGIKA (Törlés/Mentés)
+                if (!isDupe) {
+                    seenUrls.add(norm);
+                    uniqueMap.set(norm, {...currentItem});
+                } else {
+                    // Ha duplikátum és ez HTTPS, a régi meg nem, frissítsük az egyedi listában
+                    let existing = uniqueMap.get(norm);
+                    if (line.startsWith('https') && !existing.url.startsWith('https')) {
+                        uniqueMap.set(norm, {...currentItem});
+                    }
+                }
+
+                allItems.push({...currentItem});
+                currentItem = { title: '', logo: '', url: '', rawInf: '' };
+            }
+        }
+
+        // KIMENETEK TÖLTÉSE
+        document.getElementById('statBar').innerText = `Összesen: ${allItems.length} tétel | Egyedi: ${seenUrls.size} | Duplikátum: ${allItems.length - seenUrls.size}`;
+        
+        document.getElementById('outAlap').value = "#EXTM3U\n" + allItems.map(i => `#EXTINF:-1,${i.title}\n${i.url}`).join('\n');
+        
+        document.getElementById('outHtml').value = "[\n" + allItems.map(i => `    {\n        "name": "${i.title}",\n        "logo": "${i.logo}",\n        "url": "${i.url}"\n    }`).join(',\n') + "\n]";
+        
+        document.getElementById('outUrls').value = allItems.map(i => i.url).join('\n');
+        
+        document.getElementById('outClean').value = lines.filter(l => !l.startsWith('#EXTALBUMARTURL:')).join('\n');
+        
+        document.getElementById('outMarked').value = markedOutput;
+        
+        const uList = Array.from(uniqueMap.values());
+        document.getElementById('outUnique').value = "#EXTM3U\n" + uList.map(i => `#EXTINF:-1,${i.title}\n${i.url}`).join('\n');
+    }
+
+    function download(elementId, filename) {
+        const text = document.getElementById(elementId).value;
+        const blob = new Blob(["\ufeff" + text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function copyToClipboard(id) {
+        document.getElementById(id).select();
+        document.execCommand("copy");
+        alert("Másolva!");
+    }
+</script>
+
+</body>
+</html>
