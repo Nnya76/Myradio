@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Borosi Heavy-Duty Konverter (Jelölő Mód)</title>
+    <style>
+        :root { --accent: #00ff00; --bg: #0a0a0a; --panel: #1a1a1a; }
+        body { 
+            background: var(--bg); 
+            color: #eee; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh; 
+            margin: 0;
+        }
+        .container { 
+            background: var(--panel); 
+            padding: 40px; 
+            border-radius: 20px; 
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5); 
+            border: 1px solid #333;
+            width: 100%;
+            max-width: 700px;
+            text-align: center;
+        }
+        h1 { color: var(--accent); margin-bottom: 10px; font-size: 2rem; }
+        p { color: #888; margin-bottom: 30px; }
+        
+        .upload-zone {
+            border: 2px dashed #444;
+            padding: 40px;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: 0.3s;
+            background: rgba(255,255,255,0.02);
+        }
+        .upload-zone:hover {
+            border-color: var(--accent);
+            background: rgba(0,255,0,0.05);
+        }
+
+        .stats-box {
+            margin-top: 30px;
+            background: #000;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: left;
+            display: none;
+            border-left: 5px solid var(--accent);
+        }
+        .stats-line { 
+            font-family: 'Courier New', monospace; 
+            font-size: 1.1rem; 
+            margin: 5px 0;
+            color: #ccc;
+        }
+        .stats-val { color: var(--accent); font-weight: bold; }
+
+        .btn {
+            display: inline-block;
+            padding: 15px 35px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+            margin: 10px;
+        }
+        .btn-primary { background: var(--accent); color: #000; }
+        .btn-secondary { background: #0055ff; color: #fff; }
+        .btn:hover { transform: translateY(-3px); filter: brightness(1.2); }
+        .btn:disabled { background: #444; color: #888; cursor: not-allowed; transform: none; }
+
+        #status-text { margin-top: 20px; color: #ffff00; font-weight: bold; min-height: 24px; }
+        
+        .loader {
+            border: 4px solid #333;
+            border-top: 4px solid var(--accent);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            display: none;
+            margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Borosi Heavy-Duty Konverter</h1>
+        <p>Tölts be több M3U fájlt (akár 270.000+ adóig).<br>A duplikátumokat automatikusan megjelölöm.</p>
+
+        <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+            <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="#00ff00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            <div style="margin-top: 15px; font-weight: bold;">Kattints a fájlok kiválasztásához</div>
+            <div style="font-size: 0.8rem; color: #666;">(M3U vagy M3U8 fájlok)</div>
+        </div>
+        
+        <input type="file" id="fileInput" multiple accept=".m3u,.m3u8" style="display: none;" onchange="startProcessing()">
+
+        <div id="loader" class="loader"></div>
+        <div id="status-text"></div>
+
+        <div id="statsBox" class="stats-box">
+            <div class="stats-line">Összes beolvasott adó: <span id="totalStat" class="stats-val">0</span></div>
+            <div class="stats-line">Egyedi (tiszta) adók: <span id="uniqueStat" class="stats-val">0</span></div>
+            <div class="stats-line">Megjelölt duplikátum: <span id="dupStat" class="stats-val" style="color: #ff4444;">0</span></div>
+        </div>
+
+        <div id="actionArea" style="margin-top: 20px; display: none;">
+            <button class="btn btn-secondary" onclick="downloadResult()">💾 Megjelölt M3U8 Letöltése</button>
+            <button class="btn" style="background: #333; color: #ccc;" onclick="location.reload()">🔄 Újra</button>
+        </div>
+    </div>
+
+<script>
+    let finalStations = [];
+
+    async function startProcessing() {
+        const fileInput = document.getElementById('fileInput');
+        const status = document.getElementById('status-text');
+        const loader = document.getElementById('loader');
+        const statsBox = document.getElementById('statsBox');
+        const actionArea = document.getElementById('actionArea');
+        const files = fileInput.files;
+
+        if (files.length === 0) return;
+
+        // UI Reset
+        status.innerText = "Feldolgozás elindítva... Kérlek várj!";
+        loader.style.display = "block";
+        statsBox.style.display = "none";
+        actionArea.style.display = "none";
+        finalStations = [];
+
+        let seenUrls = new Set();
+        let dupCount = 0;
+        let totalCount = 0;
+
+        // Feldolgozás fájlonként
+        for (let file of files) {
+            try {
+                const text = await file.text();
+                const lines = text.split(/\r?\n/);
+                let currentName = "Névtelen";
+                let currentLogo = "";
+
+                for (let i = 0; i < lines.length; i++) {
+                    let line = lines[i].trim();
+                    if (!line) continue;
+
+                    // M3U Fejléc sor elemzése
+                    if (line.toUpperCase().startsWith("#EXTINF:")) {
+                        let logoMatch = line.match(/tvg-logo="([^"]+)"/i);
+                        currentLogo = logoMatch ? logoMatch[1] : "";
+                        let commaIndex = line.lastIndexOf(',');
+                        currentName = commaIndex > -1 ? line.substring(commaIndex + 1).trim() : "Névtelen";
+                    } 
+                    // URL sor elemzése
+                    else if (line[0] !== "#") {
+                        totalCount++;
+                        let finalName = currentName;
+                        
+                        if (seenUrls.has(line)) {
+                            finalName = "[DUPLIKÁTUM!!!] " + currentName;
+                            dupCount++;
+                        } else {
+                            seenUrls.add(line);
+                        }
+
+                        finalStations.push({
+                            n: finalName,
+                            l: currentLogo,
+                            u: line
+                        });
+                        
+                        currentName = "Névtelen";
+                        currentLogo = "";
+                    }
+                }
+            } catch (err) {
+                console.error("Hiba a fájl olvasásakor: ", file.name);
+            }
+        }
+
+        // UI Frissítés adatokkal
+        loader.style.display = "none";
+        status.innerText = "Feldolgozás kész!";
+        statsBox.style.display = "block";
+        document.getElementById('totalStat').innerText = totalCount.toLocaleString();
+        document.getElementById('uniqueStat').innerText = (totalCount - dupCount).toLocaleString();
+        document.getElementById('dupStat').innerText = dupCount.toLocaleString();
+        actionArea.style.display = "block";
+    }
+
+    function downloadResult() {
+        if (finalStations.length === 0) return;
+        
+        const status = document.getElementById('status-text');
+        status.innerText = "Fájl építése a memóriában... (Ez eltarthat egy ideig)";
+        
+        // Memória-optimalizált tömb alapú string összefűzés
+        const buffer = ["#EXTM3U\n"];
+
+        for (let i = 0; i < finalStations.length; i++) {
+            let s = finalStations[i];
+            buffer.push(`#EXTINF:-1 tvg-logo="${s.l}",${s.n}\n${s.u}\n`);
+            
+            // Periodikus visszacsatolás konzolra nagy listánál
+            if (i > 0 && i % 100000 === 0) {
+                console.log(i + " adó kész az export pufferben...");
+            }
+        }
+
+        // Blob létrehozása a pufferből
+        const blob = new Blob([buffer.join("")], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = "borosi_jelolt_lista_összes.m3u8";
+        document.body.appendChild(a);
+        a.click();
+        
+        // Takarítás
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            status.innerText = "Sikeres mentés!";
+        }, 100);
+    }
+</script>
+</body>
+</html>
