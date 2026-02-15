@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <title>Borosi RSD ⇄ M3U8 Master</title>
+    <style>
+        :root { --accent: #ff9900; --bg: #0d1117; }
+        body { background: var(--bg); color: #c9d1d9; font-family: 'Segoe UI', sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .container { background: #161b22; padding: 30px; border-radius: 20px; width: 95%; max-width: 650px; text-align: center; border: 1px solid #30363d; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+        .mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .mode-btn { background: #21262d; border: 1px solid #30363d; color: #8b949e; padding: 12px; cursor: pointer; border-radius: 8px; font-weight: bold; transition: 0.3s; }
+        .mode-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+        .drop-zone { border: 2px dashed #444; padding: 40px; border-radius: 15px; cursor: pointer; margin-bottom: 20px; background: rgba(255,153,0,0.02); }
+        .btn { background: #238636; color: white; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; font-size: 1rem; }
+        #status { margin-top: 15px; color: #8b949e; font-family: monospace; font-size: 0.9rem; }
+        code { color: var(--accent); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>RSD ⇄ M3U8 Master</h1>
+    
+    <div class="mode-switch">
+        <button class="mode-btn active" id="btnRSD" onclick="setMode('rsd2m3u')">RSD ➔ M3U8</button>
+        <button class="mode-btn" id="btnM3U" onclick="setMode('m3u2rsd')">M3U8 ➔ RSD</button>
+    </div>
+
+    <div class="drop-zone" onclick="document.getElementById('fileIn').click()">
+        <strong id="dropText">Tallózd be az RSD fájlt</strong>
+    </div>
+    <input type="file" id="fileIn" style="display:none" onchange="handleFile(this)">
+
+    <div id="status">Várakozás...</div>
+    <button id="dlBtn" class="btn" style="display:none" onclick="download()">💾 LETÖLTÉS</button>
+
+    <div style="text-align:left; font-size: 0.8rem; margin-top:20px; padding:10px; background:#0d1117; border-radius:8px;">
+        <strong>Aktuális séma:</strong><br>
+        <code>Név	Műfaj	Tags	Borosi	Nyelv	URL</code>
+    </div>
+</div>
+
+<script>
+    let mode = 'rsd2m3u';
+    let outData = "";
+    let outFileName = "";
+
+    function setMode(m) {
+        mode = m;
+        document.getElementById('btnRSD').classList.toggle('active', mode === 'rsd2m3u');
+        document.getElementById('btnM3U').classList.toggle('active', mode === 'm3u2rsd');
+        document.getElementById('dropText').innerText = mode === 'rsd2m3u' ? 'Tallózd be az RSD fájlt' : 'Tallózd be az M3U8 fájlt';
+        document.getElementById('dlBtn').style.display = 'none';
+        document.getElementById('status').innerText = "Mód váltva.";
+    }
+
+    function handleFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            if (mode === 'rsd2m3u') processRSD(e.target.result);
+            else processM3U(e.target.result);
+        };
+        reader.readAsText(file);
+    }
+
+    // RSD -> M3U8 (A 6 oszlopos Borosi sémából)
+    function processRSD(text) {
+        const lines = text.split(/\r?\n/);
+        let m3u = "#EXTM3U\n";
+        let count = 0;
+
+        lines.forEach(line => {
+            if (!line.trim() || line.toLowerCase().startsWith('name')) return;
+
+            const p = line.split('\t'); // Tabulátor mentén bontunk
+            
+            // Ha van legalább egy név és egy URL (ami nálunk a 6. elem, p[5])
+            if (p.length >= 2) {
+                const name = (p[0] || "Névtelen").trim();
+                const genre = (p[1] || "").trim();
+                const marker = (p[3] || "").trim(); // Ez a "Borosi" oszlop
+                const url = p[p.length - 1].trim(); // Mindig az utolsó elem az URL
+
+                if (url.startsWith('http')) {
+                    // M3U8-ba mentjük a kiegészítő infókat is
+                    const finalName = (marker || genre) ? `${name} [${marker} | ${genre}]` : name;
+                    m3u += `#EXTINF:-1,${finalName}\n${url}\n`;
+                    count++;
+                }
+            }
+        });
+
+        outData = m3u;
+        outFileName = "borosi_lista.m3u8";
+        finish(count);
+    }
+
+    // M3U8 -> RSD (A 6 oszlopos Borosi sémába)
+    function processM3U(text) {
+        const lines = text.split(/\r?\n/);
+        let rsd = "";
+        let count = 0;
+        let curName = "";
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            if (line.startsWith("#EXTINF:")) {
+                const comma = line.lastIndexOf(",");
+                curName = comma > -1 ? line.substring(comma + 1).trim() : "Radio";
+            } else if (line && !line.startsWith("#")) {
+                let name = curName;
+                let genre = "unknown";
+                let marker = "Borosi";
+
+                // Megpróbáljuk visszabontani a [Borosi | Műfaj] részt, ha létezik
+                const metaMatch = curName.match(/(.+) \[(.+) \| (.+)\]/);
+                if (metaMatch) {
+                    name = metaMatch[1].trim();
+                    marker = metaMatch[2].trim();
+                    genre = metaMatch[3].trim();
+                }
+
+                // A pontos 6 oszlopos kimenet
+                rsd += `${name}\t${genre}\tunknown\t${marker}\tunknown\t${line}\n`;
+                count++;
+                curName = "";
+            }
+        }
+
+        outData = rsd;
+        outFileName = "borosi_export.rsd";
+        finish(count);
+    }
+
+    function finish(c) {
+        document.getElementById('status').innerText = `Kész! ${c} adó feldolgozva.`;
+        document.getElementById('dlBtn').style.display = 'block';
+    }
+
+    function download() {
+        // UTF-8 BOM-mal a magyar ékezetek miatt
+        const blob = new Blob(["\ufeff" + outData], { type: "text/plain;charset=utf-8" });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = outFileName;
+        a.click();
+    }
+</script>
+</body>
+</html>

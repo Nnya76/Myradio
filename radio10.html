@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Borosi Pro Radio - Stable Edition</title>
+    <style>
+        :root { --accent: #00ff00; --bg: #050505; --text: #eee; --dead: #ff4444; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; height: 100vh; display: flex; overflow: hidden; }
+
+        .now-playing { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, #151515 0%, #050505 100%); border-right: 2px solid #222; padding: 20px; gap: 15px; }
+        .clock-container { font-size: 5rem; font-weight: bold; color: #ffff00; text-shadow: 0 0 20px rgba(255, 255, 0, 0.3); }
+        .logo-box { width: 350px; height: 350px; background: #000; border-radius: 20px; display: flex; align-items: center; justify-content: center; border: 10px solid var(--accent); overflow: hidden; box-shadow: 0 0 20px rgba(0,255,0,0.05); }
+        .logo-box img { max-width: 90%; max-height: 90%; object-fit: contain; }
+        .station-title { font-size: 1.8rem; color: #ffff00; font-weight: bold; text-align: center; height: 50px; margin-top: 10px; }
+
+        .admin-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 400px; margin-top: 10px; }
+        .btn { border: none; padding: 12px; font-weight: bold; border-radius: 8px; cursor: pointer; font-size: 0.8rem; transition: 0.2s; }
+        .btn-check { background: #333; color: var(--accent); border: 1px solid var(--accent); }
+        .btn-save { background: #0055ff; color: white; }
+        .btn-danger { background: #e94560; color: white; }
+        .btn:hover { filter: brightness(1.2); transform: translateY(-1px); }
+
+        .sidebar { width: 600px; background: #0f0f0f; display: flex; flex-direction: column; }
+        .search-container { padding: 20px; background: #1a1a1a; border-bottom: 2px solid var(--accent); }
+        .search-input { width: 100%; background: #000; border: 2px solid #333; color: var(--accent); padding: 15px; font-size: 1.3rem; border-radius: 12px; outline: none; box-sizing: border-box; }
+        
+        .station-list { flex: 1; overflow-y: auto; padding: 10px; }
+        .station-list::-webkit-scrollbar { width: 20px; }
+        .station-list::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 10px; }
+
+        .item { padding: 12px; margin-bottom: 8px; background: #181818; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 15px; border: 1px solid transparent; }
+        .item:hover { background: #222; }
+        .item.active { background: #252525; border-left: 8px solid var(--accent); }
+        .item.is-dead { opacity: 0.4; border-left: 8px solid var(--dead); }
+        .item img { width: 55px; height: 55px; border-radius: 6px; object-fit: cover; background: #000; }
+        .item span { font-size: 1.2rem; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .controls { padding: 15px; background: #151515; border-top: 1px solid #333; }
+        audio { width: 100%; filter: invert(0.9) hue-rotate(100deg); }
+
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.98); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+        .setup-card { background: #111; padding: 40px; border-radius: 20px; border: 2px solid var(--accent); text-align: center; width: 450px; }
+        
+        #checker-status { position: fixed; bottom: 100px; right: 20px; background: #ffff00; color: black; padding: 15px 25px; border-radius: 50px; font-weight: bold; display: none; z-index: 10001; }
+    </style>
+</head>
+<body>
+
+    <div id="overlay">
+        <div class="setup-card">
+            <h1 style="color: var(--accent); margin-bottom: 5px;">Borosi Radio</h1>
+            <p style="color: #666; margin-bottom: 25px;">Lista betöltése (M3U8 vagy JSON)</p>
+            <input type="file" id="filePicker" accept=".m3u,.m3u8,.json" style="display: none;" onchange="handleFile(this)">
+            <button class="btn btn-save" style="padding: 15px; width: 100%; font-size: 1rem;" onclick="document.getElementById('filePicker').click()">📁 FÁJL KIVÁLASZTÁSA</button>
+            <div style="margin: 15px; color: #444; font-size: 0.8rem;">VAGY MÁSOLD BE:</div>
+            <textarea id="rawInput" placeholder="#EXTM3U..." style="width:100%; height:80px; background:#000; color:var(--accent); border:1px solid #333; padding:10px; box-sizing:border-box; border-radius:8px; font-family: monospace; resize: none;"></textarea>
+            <button class="btn btn-check" style="margin-top:15px; width: 100%;" onclick="loadFromText()">🚀 BETÖLTÉS</button>
+        </div>
+    </div>
+
+    <div id="checker-status">Ellenőrzés...</div>
+
+    <div class="now-playing">
+        <div class="clock-container" id="digitalClock">00:00:00</div>
+        <div class="logo-box"><img id="mainLogo" src="https://via.placeholder.com/400?text=BOROSI"></div>
+        <div id="mainTitle" class="station-title">Készen áll a lejátszásra</div>
+        
+        <div class="admin-btns">
+            <button class="btn btn-check" onclick="persistentCheck()">🔍 ELLENŐRZÉS (3X)</button>
+            <button class="btn btn-save" onclick="downloadM3U()">💾 EXPORT (M3U8)</button>
+            <button class="btn btn-danger" onclick="clearStorage()" style="grid-column: span 2;">🗑️ LISTA TÖRLÉSE</button>
+        </div>
+        <div id="stats" style="color: #555; font-size: 0.8rem; margin-top: 10px;"></div>
+    </div>
+
+    <div class="sidebar">
+        <div class="search-container">
+            <input type="text" id="searchInput" class="search-input" placeholder="Gyorskeresés...">
+        </div>
+        <div class="station-list" id="stationList"></div>
+        <div class="controls"><audio id="audioPlayer" controls></audio></div>
+    </div>
+
+<script>
+    let stations = [];
+    const STORAGE_KEY = 'borosi_stable_v5';
+
+    window.onload = () => {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            try {
+                stations = JSON.parse(saved);
+                if (stations.length > 0) {
+                    document.getElementById('overlay').style.display = 'none';
+                    renderList();
+                }
+            } catch(e) { console.error("LocalStorage hiba."); }
+        }
+    };
+
+    function handleFile(input) {
+        const reader = new FileReader();
+        reader.onload = (e) => processInput(e.target.result);
+        reader.readAsText(input.files[0]);
+    }
+
+    function loadFromText() {
+        const text = document.getElementById('rawInput').value;
+        if(text.trim()) processInput(text);
+        else alert("Üres mező!");
+    }
+
+    function processInput(content) {
+        let tempStations = [];
+        const data = content.trim();
+        if (!data) return;
+
+        if (data[0] === '[' || data[0] === '{') {
+            try { tempStations = JSON.parse(data); } catch(e) { alert("JSON hiba!"); return; }
+        } else {
+            const lines = data.split(/\r?\n/);
+            let current = { name: '', logo: '', url: '' };
+            let seen = new Set();
+
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i].trim();
+                if (!line) continue;
+                if (line.toUpperCase().startsWith('#EXTINF:')) {
+                    let logoMatch = line.match(/tvg-logo="([^"]+)"/i);
+                    current.logo = logoMatch ? logoMatch[1] : '';
+                    let commaParts = line.split(',');
+                    current.name = commaParts.length > 1 ? commaParts[commaParts.length - 1].trim() : 'Névtelen';
+                } else if (line && !line.startsWith('#')) {
+                    if (!seen.has(line)) {
+                        seen.add(line);
+                        tempStations.push({ name: current.name, logo: current.logo, url: line });
+                    }
+                    current = { name: '', logo: '', url: '' };
+                }
+            }
+        }
+
+        if (tempStations.length > 0) {
+            stations = tempStations;
+            saveToLocal();
+            document.getElementById('overlay').style.display = 'none';
+            renderList();
+        }
+    }
+
+    function renderList(search = "") {
+        const container = document.getElementById('stationList');
+        container.innerHTML = "";
+        const filtered = stations.filter(s => s.name.toLowerCase().includes(search.toLowerCase())).slice(0, 150);
+
+        filtered.forEach(s => {
+            const isDead = s.name.startsWith("[HALOTT]");
+            const div = document.createElement('div');
+            div.className = `item ${isDead ? 'is-dead' : ''}`;
+            div.innerHTML = `<img src="${s.logo}" onerror="this.src='https://via.placeholder.com/60?text=R'"><span>${s.name}</span>`;
+            div.onclick = () => {
+                const p = document.getElementById('audioPlayer');
+                p.src = s.url;
+                p.play();
+                document.getElementById('mainLogo').src = s.logo || 'https://via.placeholder.com/400?text=RADIO';
+                document.getElementById('mainTitle').innerText = s.name;
+            };
+            container.appendChild(div);
+        });
+        updateStats();
+    }
+
+    async function persistentCheck() {
+        if (stations.length === 0) return;
+        if (!confirm(`Ellenőrzés indítása...`)) return;
+
+        const statusBox = document.getElementById('checker-status');
+        statusBox.style.display = "block";
+        let deadCount = 0;
+
+        for (let i = 0; i < stations.length; i++) {
+            let s = stations[i];
+            if (s.name.startsWith("[HALOTT]")) continue;
+            statusBox.innerText = `ELLENŐRZÉS: ${i+1}/${stations.length} | Halott: ${deadCount}`;
+
+            let success = false;
+            for (let retry = 0; retry < 3; retry++) {
+                try {
+                    const ctrl = new AbortController();
+                    const tid = setTimeout(() => ctrl.abort(), 7000);
+                    await fetch(s.url, { method: 'GET', mode: 'no-cors', signal: ctrl.signal });
+                    clearTimeout(tid);
+                    success = true; break;
+                } catch(e) { await new Promise(r => setTimeout(r, 300)); }
+            }
+            if (!success) { s.name = "[HALOTT] " + s.name; deadCount++; }
+            if (i % 100 === 0) { saveToLocal(); await new Promise(r => setTimeout(r, 1)); }
+        }
+        statusBox.style.display = "none";
+        saveToLocal(); renderList();
+        alert(`Kész! Talált halott: ${deadCount}`);
+    }
+
+    function downloadM3U() {
+        if (stations.length === 0) return;
+        let content = "#EXTM3U\n";
+        stations.forEach(s => {
+            content += `#EXTINF:-1 tvg-logo="${s.logo}",${s.name}\n${s.url}\n`;
+        });
+        const blob = new Blob([content], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = "radio_lista_fixed.m3u8"; a.click();
+    }
+
+    function saveToLocal() { 
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stations)); } 
+        catch(e) { console.warn("Lista túl nagy a mentéshez, csak ideiglenesen él."); }
+    }
+    function updateStats() {
+        const dead = stations.filter(s => s.name.startsWith("[HALOTT]")).length;
+        document.getElementById('stats').innerText = `Összesen: ${stations.length} | Hibás: ${dead}`;
+    }
+    function clearStorage() { if(confirm("Törlés?")) { localStorage.removeItem(STORAGE_KEY); location.reload(); } }
+
+    let st = null;
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+        clearTimeout(st);
+        st = setTimeout(() => renderList(e.target.value), 300);
+    });
+
+    function updateClock() { document.getElementById('digitalClock').innerText = new Date().toLocaleTimeString('hu-HU'); }
+    setInterval(updateClock, 1000); updateClock();
+</script>
+</body>
+</html>
