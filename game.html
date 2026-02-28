@@ -1,0 +1,190 @@
+﻿<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <title>Japán Folyó Átkelő - Kalibrálható Tutaj</title>
+    <style>
+        :root {
+            --river-width: 500px;
+            --bank-width: 250px;
+            --raft-offset: 0px; /* Ezt fogja állítani a csúszka */
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        #sidebar { 
+            width: 320px; background: #2c3e50; height: 100vh; padding: 20px; 
+            box-shadow: 2px 0 10px rgba(0,0,0,0.5); overflow-y: auto; box-sizing: border-box;
+        }
+        
+        #main { flex-grow: 1; position: relative; height: 100vh; display: flex; flex-direction: column; align-items: center; background: #333; }
+        
+        #game-container { 
+            position: relative; width: calc(var(--river-width) + (var(--bank-width) * 2)); 
+            height: 450px; background: #444; border: 8px solid #222; border-radius: 8px;
+            margin-top: 30px; overflow: hidden;
+        }
+        
+        .land { position: absolute; width: var(--bank-width); height: 100%; background: #5d4037; z-index: 2; transition: width 0.3s; }
+        #left-bank { left: 0; border-right: 4px solid #3e2723; }
+        #right-bank { right: 0; border-left: 4px solid #3e2723; }
+        #river { position: absolute; left: var(--bank-width); width: var(--river-width); height: 100%; background: #1976d2; z-index: 1; }
+
+        #raft { 
+            position: absolute; bottom: 40px; 
+            width: 140px; height: 75px; background: #8d6e63; border-radius: 8px; 
+            cursor: pointer; transition: left 0.8s cubic-bezier(0.45, 0.05, 0.55, 0.95); z-index: 5;
+            display: flex; justify-content: space-around; align-items: center; border: 3px solid #5d4037;
+        }
+
+        .char { 
+            width: 50px; height: 50px; border-radius: 12px; display: inline-flex; 
+            flex-direction: column; justify-content: center; align-items: center; cursor: pointer; 
+            font-size: 24px; margin: 4px; border: 2px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.1); transition: transform 0.2s, background 0.2s;
+        }
+        .char span { font-size: 10px; color: white; margin-top: 2px; font-weight: bold; text-shadow: 1px 1px 1px #000; }
+        .char:hover { transform: scale(1.1); background: rgba(255,255,255,0.3); }
+
+        /* Karakter színek az emojik mögött */
+        .apa { border-color: #1565c0; } .anya { border-color: #c62828; }
+        .rendor { border-color: #2e7d32; } .rab { border-color: #000; }
+
+        #msg { margin-top: 20px; font-size: 20px; color: #ffeb3b; height: 30px; text-align: center; font-weight: bold; }
+        
+        .settings-panel { background: #34495e; padding: 15px; border-radius: 8px; margin-top: 20px; }
+        .settings-panel label { display: block; font-size: 13px; margin-bottom: 5px; color: #bdc3c7; }
+        input[type="range"] { width: 100%; margin-bottom: 12px; accent-color: #3498db; }
+        
+        .controls { margin-top: 20px; display: flex; gap: 10px; }
+        button { padding: 12px 20px; font-size: 15px; cursor: pointer; background: #3498db; color: white; border: none; border-radius: 5px; font-weight: bold; }
+        .reset-btn { background: #e74c3c; }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <h3>📖 Szabályok</h3>
+        <p style="font-size: 13px; line-height: 1.4;">Csak Apa, Anya vagy Rendőr vezethet. Max 2 fő a tutajon. Vigyázz a gyerekekre és a rabra!</p>
+
+        <div class="settings-panel">
+            <h3>⚙️ Kalibráció</h3>
+            <label>Folyó szélessége: <span id="river-val">500</span>px</label>
+            <input type="range" id="riverRange" min="300" max="800" value="500">
+            
+            <label>Partok szélessége: <span id="bank-val">250</span>px</label>
+            <input type="range" id="bankRange" min="150" max="400" value="250">
+
+            <label style="color:#ffeb3b">Tutaj finomhangolás: <span id="offset-val">0</span>px</label>
+            <input type="range" id="offsetRange" min="-500" max="500" value="0">
+        </div>
+        <p style="font-size: 11px; opacity: 0.6;">Ha a tutaj nem érne a parthoz, a finomhangolással told el balra vagy jobbra!</p>
+    </div>
+
+    <div id="main">
+        <div id="msg">Kattints a karakterekre!</div>
+
+        <div id="game-container">
+            <div id="left-bank" class="land"><div id="left-chars" style="padding:10px; display:flex; flex-wrap:wrap;"></div></div>
+            <div id="river">
+                <div id="raft"></div>
+            </div>
+            <div id="right-bank" class="land"><div id="right-chars" style="padding:10px; display:flex; flex-wrap:wrap;"></div></div>
+        </div>
+
+        <div class="controls">
+            <button onclick="moveRaft()">Tutaj INDÍTÁSA (GO)</button>
+            <button class="reset-btn" onclick="resetGame()">Újrakezdés</button>
+        </div>
+    </div>
+
+    <script>
+        const chars = [
+            { id: 'apa', name: 'APA', emoji: '👨', canDrive: true, side: 'left' },
+            { id: 'anya', name: 'ANYA', emoji: '👩', canDrive: true, side: 'left' },
+            { id: 'fiu1', name: 'FIÚ 1', emoji: '👦', canDrive: false, side: 'left', type: 'fiu' },
+            { id: 'fiu2', name: 'FIÚ 2', emoji: '👦', canDrive: false, side: 'left', type: 'fiu' },
+            { id: 'lany1', name: 'LÁNY 1', emoji: '👧', canDrive: false, side: 'left', type: 'lany' },
+            { id: 'lany2', name: 'LÁNY 2', emoji: '👧', canDrive: false, side: 'left', type: 'lany' },
+            { id: 'rendor', name: 'RENDŐR', emoji: '👮', canDrive: true, side: 'left' },
+            { id: 'rab', name: 'RAB', emoji: '⛓️', canDrive: false, side: 'left' }
+        ];
+
+        let raftSide = 'left';
+        let raftPassengeres = [];
+        let riverWidth = 500;
+        let bankWidth = 250;
+        let raftOffset = -258;
+
+        // Csúszkák eseménykezelői
+        document.getElementById('riverRange').oninput = function() { riverWidth = parseInt(this.value); document.getElementById('river-val').innerText = riverWidth; updateDim(); };
+        document.getElementById('bankRange').oninput = function() { bankWidth = parseInt(this.value); document.getElementById('bank-val').innerText = bankWidth; updateDim(); };
+        document.getElementById('offsetRange').oninput = function() { raftOffset = parseInt(this.value); document.getElementById('offset-val').innerText = raftOffset; updateDim(); };
+
+        function updateDim() {
+            document.documentElement.style.setProperty('--river-width', riverWidth + 'px');
+            document.documentElement.style.setProperty('--bank-width', bankWidth + 'px');
+            render();
+        }
+
+        function render() {
+            const leftC = document.getElementById('left-chars'), rightC = document.getElementById('right-chars'), rft = document.getElementById('raft');
+            leftC.innerHTML = ''; rightC.innerHTML = ''; rft.innerHTML = '';
+
+            chars.forEach(c => {
+                const div = document.createElement('div');
+                div.className = `char ${c.id.includes('fiu') ? 'fiu' : c.id.includes('lany') ? 'lany' : c.id}`;
+                div.innerHTML = `${c.emoji}<span>${c.name}</span>`;
+                
+                if (c.side === 'raft') {
+                    div.onclick = () => leaveRaft(c);
+                    rft.appendChild(div);
+                } else {
+                    div.onclick = () => boardRaft(c);
+                    document.getElementById(c.side + '-chars').appendChild(div);
+                }
+            });
+
+            // Tutaj pozíció számítása kalibrációval
+            const leftGoal = bankWidth + raftOffset;
+            const rightGoal = bankWidth + riverWidth - 140 + raftOffset;
+            rft.style.left = (raftSide === 'left' ? leftGoal : rightGoal) + 'px';
+        }
+
+        function boardRaft(c) { if (c.side === raftSide && raftPassengeres.length < 2) { c.side = 'raft'; raftPassengeres.push(c); render(); } }
+        function leaveRaft(c) { c.side = raftSide; raftPassengeres = raftPassengeres.filter(p => p.id !== c.id); render(); }
+
+        function checkSafety(side) {
+            const s = chars.filter(c => c.side === side);
+            if (s.length === 0) return true;
+            const hasApa = s.some(c => c.id === 'apa'), hasAnya = s.some(c => c.id === 'anya'), hasRendor = s.some(c => c.id === 'rendor');
+            const hasRab = s.some(c => c.id === 'rab'), hasFiu = s.some(c => c.type === 'fiu'), hasLany = s.some(c => c.type === 'lany');
+
+            if (hasRab && s.length > 1 && !hasRendor) return "⚠️ A Rab bántotta a családot!";
+            if (hasApa && hasLany && !hasAnya) return "⚠️ Az Apa nem maradhat a lányokkal Anya nélkül!";
+            if (hasAnya && hasFiu && !hasApa) return "⚠️ Az Anya nem maradhat a fiúkkal Apa nélkül!";
+            return true;
+        }
+
+        function moveRaft() {
+            if (raftPassengeres.length === 0) return msg("Üres a tutaj!");
+            if (!raftPassengeres.some(p => p.canDrive)) return msg("Nincs vezető!");
+
+            const oldSide = raftSide;
+            raftSide = (raftSide === 'left') ? 'right' : 'left';
+            
+            if (checkSafety(oldSide) !== true) { msg(checkSafety(oldSide)); resetGame(); return; }
+            render();
+
+            setTimeout(() => {
+                if (checkSafety(raftSide) !== true) { msg(checkSafety(raftSide)); resetGame(); }
+                else if (chars.every(c => c.side === 'right')) msg("🎉 SIKER! Mindenki átért!");
+            }, 850);
+        }
+
+        function msg(t) { document.getElementById('msg').innerText = t; }
+        function resetGame() { chars.forEach(c => c.side = 'left'); raftPassengeres = []; raftSide = 'left'; render(); }
+
+        updateDim();
+    </script>
+</body>
+</html>

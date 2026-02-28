@@ -1,0 +1,126 @@
+﻿<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M3U Extractor & Converter</title>
+    <style>
+        body { font-family: sans-serif; background: #121212; color: #e0e0e0; padding: 20px; max-width: 800px; margin: auto; }
+        textarea { width: 100%; height: 300px; background: #1e1e1e; color: #00ff00; border: 1px solid #333; padding: 10px; font-family: monospace; }
+        .controls { margin: 20px 0; display: flex; gap: 10px; align-items: center; }
+        button { padding: 10px 20px; cursor: pointer; background: #2563eb; color: white; border: none; border-radius: 4px; font-weight: bold; }
+        button:disabled { background: #444; }
+        #progressContainer { width: 100%; background: #333; height: 10px; border-radius: 5px; display: none; margin-top: 10px; }
+        #progressBar { width: 0%; height: 100%; background: #00ff00; border-radius: 5px; transition: width 0.1s; }
+        .stats { font-size: 0.9em; color: #888; }
+    </style>
+</head>
+<body>
+
+    <h2>M3U Logo Konverter (300k+ sor támogatás)</h2>
+    <p>Másold be a forráskódot (EXTINF, EXTALBUMARTURL, URL hármasokat):</p>
+    
+    <textarea id="input" placeholder="#EXTINF:-1,[HUN] Radio1 [Eger]&#10;#EXTALBUMARTURL:file://...&#10;http://..."></textarea>
+
+    <div class="controls">
+        <button id="convertBtn">Átalakítás indítása</button>
+        <button id="copyBtn" disabled>Másolás a vágólapra</button>
+        <span class="stats" id="stats"></span>
+    </div>
+
+    <div id="progressContainer">
+        <div id="progressBar"></div>
+    </div>
+
+    <p>Eredmény (.m3u8 formátum):</p>
+    <textarea id="output" readonly placeholder="Az eredmény itt fog megjelenni..."></textarea>
+
+    <script>
+        const inputArea = document.getElementById('input');
+        const outputArea = document.getElementById('output');
+        const convertBtn = document.getElementById('convertBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const progressBar = document.getElementById('progressBar');
+        const progressContainer = document.getElementById('progressContainer');
+        const stats = document.getElementById('stats');
+
+        convertBtn.onclick = () => {
+            const text = inputArea.value.trim();
+            if (!text) return;
+
+            convertBtn.disabled = true;
+            progressContainer.style.display = 'block';
+            outputArea.value = "Feldolgozás... kérlek várj...";
+
+            // Web Worker létrehozása "röptében", hogy ne kelljen külön fájl
+            const workerCode = `
+                onmessage = function(e) {
+                    const lines = e.data.split(/\\r?\\n/);
+                    let result = "#EXTM3U\\n";
+                    let count = 0;
+                    
+                    for (let i = 0; i < lines.length; i++) {
+                        let line = lines[i].trim();
+                        
+                        if (line.startsWith("#EXTINF")) {
+                            let extinf = line;
+                            let logo = "";
+                            let url = "";
+
+                            // Megkeressük a következő sorokat (logo és url)
+                            if (i + 1 < lines.length && lines[i+1].includes("#EXTALBUMARTURL:")) {
+                                logo = lines[i+1].replace("#EXTALBUMARTURL:", "").trim();
+                                if (i + 2 < lines.length) {
+                                    url = lines[i+2].trim();
+                                    i += 2; // Átugorjuk a feldolgozott sorokat
+                                }
+                            }
+
+                            if (logo && url) {
+                                // Összerakjuk az új formátumot
+                                // #EXTINF:-1 tvg-logo="LOGO",NEV
+                                let parts = extinf.split(",");
+                                let prefix = parts[0]; // #EXTINF:-1
+                                let name = parts.slice(1).join(","); // [HUN] Radio1 [Eger]
+                                
+                                result += prefix + ' tvg-logo="' + logo + '",' + name + "\\n" + url + "\\n";
+                                count++;
+                            }
+                        }
+
+                        // Progress jelentés minden 5000. sornál
+                        if (i % 5000 === 0) {
+                            postMessage({type: 'progress', percent: (i / lines.length) * 100});
+                        }
+                    }
+                    postMessage({type: 'done', data: result, count: count});
+                };
+            `;
+
+            const blob = new Blob([workerCode], { type: 'application/javascript' });
+            const worker = new Worker(URL.createObjectURL(blob));
+
+            worker.postMessage(text);
+
+            worker.onmessage = (e) => {
+                if (e.data.type === 'progress') {
+                    progressBar.style.width = e.data.percent + '%';
+                } else if (e.data.type === 'done') {
+                    outputArea.value = e.data.data;
+                    stats.innerText = e.data.count.toLocaleString() + " adó feldolgozva.";
+                    convertBtn.disabled = false;
+                    copyBtn.disabled = false;
+                    progressBar.style.width = '100%';
+                    setTimeout(() => progressContainer.style.display = 'none', 500);
+                }
+            };
+        };
+
+        copyBtn.onclick = () => {
+            outputArea.select();
+            document.execCommand('copy');
+            alert('Másolva a vágólapra!');
+        };
+    </script>
+</body>
+</html>
