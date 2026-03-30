@@ -1,0 +1,90 @@
+﻿<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Borosi Menü</title>
+    <style>
+        /* STÍLUS BEÁLLÍTÁSOK - Itt a kinézetet tudod módosítani */
+        :root {
+            --bg: #000000;
+            --accent: #00d1b2;
+            --btn-bg: #111;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: white;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .menu-grid {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .nav-button {
+            background: var(--btn-bg);
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 18px;
+            color: white;
+            text-decoration: none;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .nav-button:active {
+            background: #222;
+            border-color: var(--accent);
+        }
+
+        h1 { color: var(--accent); margin-bottom: 30px; }
+    </style>
+</head>
+<body>
+
+    <h1>Menu</h1>
+
+    <div class="menu-grid">
+
+        <a href="radio.html" class="nav-button">
+            <span>Rádió 170000 adó</span>
+        </a>
+
+        <a href="radiolite.html" class="nav-button">
+            <span>Rádió Magyar adókkal</span>
+        </a>
+		
+		<a href="radio6.html" class="nav-button">
+            <span>Rádió6</span>
+        </a>
+		
+		 <a href="radio8.html" class="nav-button">
+            <span>Rádió Windowshoz</span>
+        </a>
+		
+		<a href="radio888.html" class="nav-button">
+            <span>Rádió Androidhoz</span>
+        </a>
+		
+		<a href="radio8888.html" class="nav-button">
+            <span>radio8888</span>
+        </a>
+		
+		<a href="radio88888.html" class="nav-button">
+            <span>radio88888</span>
+        </a>
+
+    </div>
+
+    </body>
+</html>

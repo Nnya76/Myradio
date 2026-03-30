@@ -1,0 +1,74 @@
+﻿<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <title>Kodi Rádió M3U Konvertáló</title>
+    <style>
+        body { font-family: sans-serif; background: #2c3e50; color: white; padding: 20px; line-height: 1.6; }
+        .container { max-width: 900px; margin: 0 auto; background: #34495e; padding: 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        h2 { color: #3498db; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        textarea { width: 100%; height: 200px; background: #1a252f; color: #ecf0f1; border: 1px solid #7f8c8d; padding: 10px; border-radius: 5px; font-family: monospace; box-sizing: border-box; }
+        button { background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 10px; transition: 0.3s; }
+        button:hover { background: #2ecc71; }
+        .output-container { margin-top: 20px; position: relative; }
+        .copy-btn { background: #3498db; margin-bottom: 5px; }
+        .info { font-size: 0.9em; color: #bdc3c7; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📻 Kodi M3U Logó Konvertáló</h2>
+    <p class="info">Másold be a Windows-os listádat, és a program kiszedi a felesleges útvonalakat, hogy Androidon és LibreELEC-en is működjön a logó megjelenítés.</p>
+    
+    <label>Eredeti M3U tartalom:</label>
+    <textarea id="inputM3U" placeholder="#EXTINF:-1 tvg-logo=&quot;file://d:\media\audio\logos\radio1.png&quot;,[HUN] Radio1..."></textarea>
+    
+    <button onclick="convertM3U()">Konvertálás platformfüggetlen formátumra</button>
+
+    <div class="output-container">
+        <label>Tisztított Kodi-barát kimenet:</label>
+        <button class="copy-btn" onclick="copyToClipboard()">Másolás a vágólapra</button>
+        <textarea id="outputM3U" readonly></textarea>
+    </div>
+</div>
+
+<script>
+function convertM3U() {
+    const input = document.getElementById('inputM3U').value;
+    const lines = input.split('\n');
+    let result = [];
+
+    if (!input.includes('#EXTM3U')) {
+        result.push('#EXTM3U');
+    }
+
+    lines.forEach(line => {
+        if (line.trim() === '') return;
+
+        if (line.startsWith('#EXTINF')) {
+            // Logó keresése
+            let cleanLine = line.replace(/tvg-logo=["'](.*?)["']/gi, (match, p1) => {
+                // Csak a fájlnevet tartjuk meg (Windows és Linux elválasztók kezelése)
+                let filename = p1.split(/[\\/]/).pop();
+                return `tvg-logo="${filename}"`;
+            });
+            result.push(cleanLine);
+        } else if (!line.startsWith('#EXTM3U')) {
+            result.push(line);
+        }
+    });
+
+    document.getElementById('outputM3U').value = result.join('\n');
+}
+
+function copyToClipboard() {
+    const output = document.getElementById('outputM3U');
+    output.select();
+    document.execCommand('copy');
+    alert('Másolva a vágólapra!');
+}
+</script>
+
+</body>
+</html>
