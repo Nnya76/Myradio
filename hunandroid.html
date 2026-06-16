@@ -1,0 +1,4741 @@
+﻿<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>📻 Borosi Radio Lite📻</title>
+    <style>
+        /* ============================================================
+           BEÁLLÍTÁSOK (Itt tudod finomítani a kinézetet)
+           ============================================================ */
+        :root {
+            --green: #00ff00;          /* Fő keret és gomb szín */
+            --yellow: #ffff00;         /* Óra és aktuális cím színe */
+
+            /* --- ASZTALI (PC) MÉRETEK --- */
+            --desk-clock-size: 3rem;    /* Óra mérete gépen */
+            --desk-logo-size: 420px;    /* Logó mérete gépen */
+            --desk-title-size: 3rem;  /* Szóló adó címe gépen */
+            --desk-list-width: 620px;   /* Jobb oldali lista szélessége */
+            --desk-item-font: 1.5rem;     /* Lista betűmérete gépen */
+
+            /* --- MOBIL MÉRETEK --- */
+            --mob-player-height: 24vh;  /* Felső rész magassága (vh = képernyő %-a) */
+            --mob-clock-size: 1.1rem;   /* Óra mérete mobilon */
+            --mob-logo-size: 100px;     /* Logó mérete mobilon */
+            --mob-title-size: 1.1rem;   /* Szóló adó címe mobilon */
+            --mob-list-font: 1.1rem;    /* Lista betűmérete mobilon (hogy könnyebb legyen rányomni) */
+        }
+
+        /* --- ALAP STÍLUS (Ne bántsd, hacsak nem muszáj) --- */
+        body { 
+            background: url('./logos/fanart1.jpg') no-repeat center center fixed; 
+            background-size: cover; color: #eee; font-family: 'Segoe UI', sans-serif; 
+            margin: 0; height: 100vh; display: flex; overflow: hidden; 
+        }
+
+        body::before {
+            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.6); z-index: -1;
+        }
+
+        .main-container { display: flex; width: 100%; height: 100%; position: relative; }
+
+        /* BAL OLDAL (PC) / FELSŐ RÉSZ (MOBIL) */
+        .player-side { 
+            flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            background: rgba(0, 0, 0, 0.4); border-right: 1px solid rgba(255,255,255,0.1); 
+            padding: 20px; text-align: center;
+        }
+
+        /* JOBB OLDAL (PC) / ALSÓ RÉSZ (MOBIL) */
+        .list-side { 
+            width: var(--desk-list-width); background: rgba(10, 10, 10, 0.9); 
+            display: flex; flex-direction: column; position: relative; backdrop-filter: blur(15px);
+            overflow: hidden;
+        }
+
+        .clock-container { font-size: var(--desk-clock-size); font-weight: bold; color: var(--yellow); text-shadow: 0 0 20px rgba(255,255,0,0.5); }
+        
+        .logo-box { 
+            width: var(--desk-logo-size); height: var(--desk-logo-size); 
+            border: 4px solid var(--green); border-radius: 15px; 
+            display: flex; align-items: center; justify-content: center; overflow: hidden; background: #000; 
+        }
+        .logo-box img { max-width: 90%; max-height: 90%; object-fit: contain; }
+
+        #mainTitle { margin-top: 15px; font-weight: bold; color: var(--yellow); font-size: var(--desk-title-size); }
+
+        /* FIX KERESŐ ÉS STATISZTIKA */
+        .search-container { padding: 12px; background: rgba(20, 20, 20, 0.98); border-bottom: 2px solid var(--green); position: sticky; top: 0; z-index: 10; }
+        .search-input { width: 100%; background: #000; border: 1px solid #444; color: var(--green); padding: 12px; border-radius: 8px; outline: none; box-sizing: border-box; font-size: 1rem; }
+        .stats { font-size: 0.75rem; color: #aaa; margin-top: 6px; text-align: right; font-family: monospace; }
+
+        /* LISTA GÖRDÜLŐ RÉSZE */
+        .station-list { flex: 1; overflow-y: auto; padding: 10px; scroll-behavior: smooth; }
+        .item { 
+            padding: 10px; margin-bottom: 6px; background: rgba(45, 45, 45, 0.5); border-radius: 8px; 
+            display: flex; align-items: center; gap: 12px; cursor: pointer; border: 1px solid rgba(255,255,255,0.05); 
+            font-size: var(--desk-item-font);
+        }
+        .item.active { border-left: 6px solid var(--green); background: rgba(0, 255, 0, 0.15); }
+        .item img { width: 48px; height: 48px; border-radius: 4px; object-fit: cover; background: #222; }
+
+        /* VEZÉRLŐK */
+        .controls { padding: 12px; background: #000; border-top: 1px solid #333; position: sticky; bottom: 0; z-index: 10; }
+        .ctrl-group { display: flex; justify-content: space-around; align-items: center; gap: 10px; }
+        .ctrl-btn { background: #151515; border: 1px solid var(--green); color: var(--green); padding: 12px; border-radius: 8px; cursor: pointer; font-size: 1.2rem; flex: 1; }
+        
+        #scrollTopBtn { position: fixed; bottom: 110px; right: 20px; width: 45px; height: 45px; background: var(--green); color: #000; border: none; border-radius: 50%; font-size: 1.4rem; cursor: pointer; display: none; z-index: 100; }
+
+        /* ============================================================
+           MOBIL NÉZETI BEÁLLÍTÁSOK (850px alatt lép életbe)
+           ============================================================ */
+        @media (max-width: 850px) {
+            body { overflow: hidden; height: 100vh; }
+            .main-container { flex-direction: column; height: 100%; }
+            
+            .player-side { 
+                height: var(--mob-player-height); flex: none; 
+                background: rgba(0, 0, 0, 0.95); border-bottom: 2px solid var(--green);
+                justify-content: center; /* Ha a tetejére akarod: flex-start, és adj padding-top-ot */
+            }
+            
+            .list-side { width: 100%; flex: 1; }
+            
+            .clock-container { font-size: var(--mob-clock-size) !important; }
+            .logo-box { width: var(--mob-logo-size) !important; height: var(--mob-logo-size) !important; }
+            #mainTitle { font-size: var(--mob-title-size) !important; }
+            .item { font-size: var(--mob-list-font) !important; }
+        }
+
+        audio { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <div class="player-side">
+            <div class="clock-container" id="digitalClock">00:00:00</div>
+            <div class="logo-box"><img id="mainLogo" src="./logos/fanart1.jpg"></div>
+            <div id="mainTitle">Válassz adót...</div>
+        </div>
+
+        <div class="list-side">
+            <div class="search-container">
+                <input type="text" id="searchInput" class="search-input" placeholder="Keresés...">
+                <div class="stats" id="stats">Betöltés...</div>
+            </div>
+            
+            <button id="scrollTopBtn">↑</button>
+            <div class="station-list" id="stationList"></div>
+            
+            <div class="controls">
+                <div class="ctrl-group">
+                    <button onclick="prevStation()" class="ctrl-btn">⏮</button>
+                    <button id="playPauseBtn" onclick="togglePlay()" class="ctrl-btn">▶</button>
+                    <button onclick="nextStation()" class="ctrl-btn">⏭</button>
+                    <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1" oninput="changeVolume(this.value)" style="width: 60px; accent-color: var(--green);">
+                </div>
+                <audio id="audioPlayer"></audio>
+            </div>
+        </div>
+    </div>
+
+<script>
+    /* IDE MÁSOLD BE A 170.386 ADÓT */
+    const stations = [
+    {
+        "name": "[HUN] Radio1 [Eger]",
+        "logo": "logos/radio1.png",
+        "url": "http://icast.connectmedia.hu/5226/live.mp3"
+    },
+    {
+        "name": "[HUN] BestFM [Eger]",
+        "logo": "logos/bestfm.png",
+        "url": "http://icast.connectmedia.hu/5116/live.mp3"
+    },
+    {
+        "name": "[HUN] Hir FM  [Eger]",
+        "logo": "logos/hirfm.png",
+        "url": "https://stream.rcs.revma.com:443/3zbwnap8b2uvv"
+    },
+    {
+        "name": "[HUN] Radio Now!",
+        "logo": "logos/radionow.jpg",
+        "url": "http://s01.diazol.hu:10070/now"
+    },
+    {
+        "name": "[HUN] Dj Now!",
+        "logo": "logos/djnow.jpg",
+        "url": "https://s01.diazol.hu:10072/djnow"
+    },
+    {
+        "name": "[HUN] Drop Now!",
+        "logo": "logos/dropnow.jpg",
+        "url": "https://s01.diazol.hu:10072/dropnow"
+    },
+    {
+        "name": "[HUN] Party Now!",
+        "logo": "logos/partynow.jpg",
+        "url": "https://s01.diazol.hu:10072/partynow"
+    },
+    {
+        "name": "[HUN] Laza Rádió",
+        "logo": "logos/laza.png",
+        "url": "http://stream.lazaradio.com:8100/live.ogg"
+    },
+    {
+        "name": "[HUN] Laza Rádió Mulatós [📻Mulatós📻]",
+        "logo": "logos/laza.png",
+        "url": "https://stream.lazaradio.com/mulatos.mp3"
+    },
+    {
+        "name": "[HUN] Legyenazenemindenki [nem minden nyitja meg]",
+        "logo": "logos/radio.jpg",
+        "url": "https://stream1.virtualisan.net:443/prx/4260/live.mp3"
+    },
+    {
+        "name": "[HUN] Irénke Mulatós Rádió [📻Mulatós📻]",
+        "logo": "logos/irenke.png",
+        "url": "http://s03.diazol.hu:10090/stream"
+    },
+    {
+        "name": "[HUN] Mercy Rádió  Mulatós Magyar Rádió [📻Mulatós📻]",
+        "logo": "logos/mercy.png",
+        "url": "http://stream.mercyradio.eu/mulatos.mp3"
+    },
+    {
+        "name": "[HUN] Magyar Mulatós Rádió [📻Mulatós📻]",
+        "logo": "logos/magyarmulatosradio.png",
+        "url": "http://cast3.my-control-panel.com:8451/live"
+    },
+    {
+        "name": "[HUN] Nóta FM >> Mulatós slágerek [📻Mulatós📻]",
+        "logo": "logos/notafm.png",
+        "url": "http://live.notafm.hu:8000/notafm.mp3"
+    },
+    {
+        "name": "[HUN] BDPST Rock [☠ROCK☠]",
+        "logo": "logos/bdpstrock.jpg",
+        "url": "http://s2.audiostream.hu:8081/bdpstrock_320k"
+    },
+    {
+        "name": "[HUN] Mercy Rádió  Rock Magyar Rádió [☠ROCK☠]",
+        "logo": "logos/mercy.png",
+        "url": "http://stream.mercyradio.eu:80/magyarrock.mp3"
+    },
+    {
+        "name": "[HUN] FM 103.9 A ROCK [☠ROCK☠]",
+        "logo": "logos/rock103.9.png",
+        "url": "http://icast.connectmedia.hu/5301/live.mp3"
+    },
+    {
+        "name": "[HUN] Rocker Rádió [☠ROCK☠]",
+        "logo": "logos/rocker.png",
+        "url": "https://rockerradio.online/live.mp3"
+    },
+    {
+        "name": "[HUN] RockParadicsom [☠ROCK☠]",
+        "logo": "logos/rockparadicsom.jpg",
+        "url": "http://stream1.virtualisan.net:6590/live.mp3"
+    },
+    {
+        "name": "[HUN] ROCKODIL [☠ROCK☠]",
+        "logo": "logos/rockodil.png",
+        "url": "http://79.139.60.24:8000/rockodil"
+    },
+    {
+        "name": "[HUN] COOLFM ROCK [☠ROCK☠]",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc10"
+    },
+    {
+        "name": "[HUN] Oxygen Classic Rock [☠ROCK☠]",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:8443/oxygenclassicrock"
+    },
+    {
+        "name": "[HUN] Metal Express Radio [☠ROCK☠]",
+        "logo": "logos/metal_express.png",
+        "url": "http://s39.myradiostream.com:11590/listen/;.mp3"
+    },
+    {
+        "name": "[HUN] COOL FM",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/cfmhq"
+    },
+    {
+        "name": "[HUN] COOLFM Goldies",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/goldhq"
+    },
+    {
+        "name": "[HUN] COOLFM  Love Songs",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc28"
+    },
+    {
+        "name": "[HUN] COOLFM 2000's",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc03"
+    },
+    {
+        "name": "[HUN] COOLFM 2010's",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc02"
+    },
+    {
+        "name": "[HUN] COOLFM 90's",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc05"
+    },
+    {
+        "name": "[HUN] COOLFM 90's Dance",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc06?ver=887687"
+    },
+    {
+        "name": "[HUN] COOLFM Acoustic",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc12"
+    },
+    {
+        "name": "[HUN] COOLFM Best Hits",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc11"
+    },
+    {
+        "name": "[HUN] COOLFM Bside",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc16"
+    },
+    {
+        "name": "[HUN] COOLFM Chillout",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc24"
+    },
+    {
+        "name": "[HUN] COOLFM Country",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc17"
+    },
+    {
+        "name": "[HUN] COOLFM Dance 2000's",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc04?ver=209775"
+    },
+    {
+        "name": "[HUN] COOLFM Filmzenék",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc01?ver=753658"
+    },
+    {
+        "name": "[HUN] COOLFM Girl power",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc15?ver=58649"
+    },
+    {
+        "name": "[HUN] COOLFM Hazai kedvencek",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc19"
+    },
+    {
+        "name": "[HUN] COOLFM HOT HITS!",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc22"
+    },
+    {
+        "name": "[HUN] COOLFM Jazz",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc13"
+    },
+    {
+        "name": "[HUN] COOLFM Karácsonyi zenék [🎄Christmas🎄]",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc27"
+    },
+    {
+        "name": "[HUN] COOLFM Latin",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc07"
+    },
+    {
+        "name": "[HUN] COOLFM Nyári slágerek",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc09"
+    },
+    {
+        "name": "[HUN] COOLFM Party Hits",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc18"
+    },
+    {
+        "name": "[HUN] COOLFM Rap/Hip-hop",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc08"
+    },
+    {
+        "name": "[HUN] COOLFM Remix",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc23?ver=266114"
+    },
+    {
+        "name": "[HUN] COOLFM Soul & funky",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc25"
+    },
+    {
+        "name": "[HUN] COOLFM SPORT",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc20"
+    },
+    {
+        "name": "[HUN] COOLFM Trance / Elektro",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc14"
+    },
+    {
+        "name": "[HUN] COOLFM WORLD Music",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/zc26"
+    },
+    {
+        "name": "[HUN] oxygenmusic",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:2443/hls/oxygenmusic.m3u8"
+    },
+    {
+        "name": "[HUN] oxygenmusic_5000",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:2443/hls/oxygenmusic_5000.m3u8"
+    },
+    {
+        "name": "[HUN] Oxygen 80's",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:8443/oxygenthe80shits"
+    },
+    {
+        "name": "[HUN] Oxygen 90's",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:8443/oxygenthe90shits"
+    },
+    {
+        "name": "[HUN] Oxygen Black Music",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:8443/blackmusic_128"
+    },
+    {
+        "name": "[HUN] Oxygen Classics",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:8443/Classic_128"
+    },
+    {
+        "name": "[HUN] Oxygen Fitness",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:8443/oxygenfitness"
+    },
+    {
+        "name": "[HUN] Oxygen Happy",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:8443/oxygenhappy_320"
+    },
+    {
+        "name": "[HUN] Oxygen Indie",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:8443/oxygenindie"
+    },
+    {
+        "name": "[HUN] Oxygen Italo Hits",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:8443/oxygenitalohits"
+    },
+    {
+        "name": "[HUN] Oxygen Kids",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:8443/oxygenkids"
+    },
+    {
+        "name": "[HUN] Oxygen Lounge",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:8443/oxygenlounge"
+    },
+    {
+        "name": "[HUN] Oxygen Love Songs",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:8443/oxygenlovesongs"
+    },
+    {
+        "name": "[HUN] Oxygen Magyar Zene",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:8443/oxygenmagyarzene"
+    },
+    {
+        "name": "[HUN] Oxygen Music",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:8443/oxygenmusic"
+    },
+    {
+        "name": "[HUN] Oxygen Oldies",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:8443/oxygenoldies"
+    },
+    {
+        "name": "[HUN] Oxygen Spencer Hill",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:8443/oxygenspencerhillzenek"
+    },
+    {
+        "name": "[HUN] Oxygen Music Balaton FM 105.7",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:8443/oxygenmusic_balaton_320"
+    },
+    {
+        "name": "[HUN] Oxygen Xmas [🎄Christmas🎄]",
+        "logo": "logos/oxygen.png",
+        "url": "http://oxygenmusic.hu:8000/xmas_320"
+    },
+    {
+        "name": "[HUN] Only 1 XTRA 192kbps",
+        "logo": "logos/ONLY1.png",
+        "url": "https://stream.only1.hu/xtra"
+    },
+    {
+        "name": "[HUN] Only 1 NATION 192kbps",
+        "logo": "logos/ONLY1.png",
+        "url": "https://stream.only1.hu/nation"
+    },
+    {
+        "name": "[HUN] Only 1 HITS 192kbps",
+        "logo": "logos/ONLY1.png",
+        "url": "https://stream.only1.hu/hits"
+    },
+    {
+        "name": "[HUN] Only 1 ELECTRO 192kbps",
+        "logo": "logos/ONLY1.png",
+        "url": "https://stream.only1.hu/electro"
+    },
+    {
+        "name": "[HUN] Only 1 BEATS 192kbps",
+        "logo": "logos/ONLY1.png",
+        "url": "https://stream.only1.hu/beats"
+    },
+    {
+        "name": "[HUN] Only 1 Classics 192kbps",
+        "logo": "logos/ONLY1.png",
+        "url": "https://stream.only1.hu/classics"
+    },
+    {
+        "name": "[HUN] Klubrádió",
+        "logo": "logos/klubradio.png",
+        "url": "http://hu-stream04.klubradio.hu:8080/bpstream"
+    },
+    {
+        "name": "[HUN] Danubius Rádió",
+        "logo": "logos/danubius.png",
+        "url": "http://danubiusradio.hu/danubius_HiFi.m3u"
+    },
+    {
+        "name": "[HUN] Roxy Rádió",
+        "logo": "logos/roxy.png",
+        "url": "http://s2.audiostream.hu/roxy_FLAC"
+    },
+    {
+        "name": "[HUN] Youventus Rádió",
+        "logo": "logos/youventus.png",
+        "url": "http://s2.audiostream.hu:8090/juventus_FLAC"
+    },
+    {
+        "name": "[HUN] Retró Rádió",
+        "logo": "logos/retro.png",
+        "url": "http://icast.connectmedia.hu/5001/live.mp3"
+    },
+    {
+        "name": "[HUN] Sláger FM",
+        "logo": "logos/slagerfm.png",
+        "url": "https://slagerfm.netregator.hu:7813/slagerfm320.mp3"
+    },
+    {
+        "name": "[HUN] TOP FM base >> Top40 House Electro",
+        "logo": "logos/topfm.png",
+        "url": "http://live.topfm.hu:8000/base.mp3"
+    },
+    {
+        "name": "[HUN] TOP FM max >> 10s 20s",
+        "logo": "logos/topfm.png",
+        "url": "http://live.topfm.hu:8000/max.mp3"
+    },
+    {
+        "name": "[HUN] TOP FM oldies >> 50s 60s 70s 80s",
+        "logo": "logos/topfm.png",
+        "url": "http://live.topfm.hu:8000/oldies.mp3"
+    },
+    {
+        "name": "[HUN] TOP FM radio >> 90s 00s",
+        "logo": "logos/topfm.png",
+        "url": "http://live.topfm.hu:8000/radio.mp3"
+    },
+    {
+        "name": "[HUN] Mercy Radio  Kabaré Magyar Rádió",
+        "logo": "logos/mercy.png",
+        "url": "http://stream.mercyradio.eu/kabare.mp3"
+    },
+    {
+        "name": "[HUN] Mercy Rádió  Retro Magyar Rádiója",
+        "logo": "logos/mercy.png",
+        "url": "http://stream.mercyradio.eu:80/retro.mp3"
+    },
+    {
+        "name": "[HUN] Mercy Rádió a Te rádiód",
+        "logo": "logos/mercy.png",
+        "url": "http://stream.mercyradio.eu/mercyradio.mp3"
+    },
+    {
+        "name": "[HUN] radio-d.hu _ opera",
+        "logo": "logos/radio_d.png",
+        "url": "http://178.238.223.39:8000/opera.m3u"
+    },
+    {
+        "name": "[HUN] radio-d.hu _ Pop / Rock",
+        "logo": "logos/radio_d.png",
+        "url": "http://178.238.223.39:8000/poprock.m3u"
+    },
+    {
+        "name": "[HUN] radio-d.hu _ Operett",
+        "logo": "logos/radio_d.png",
+        "url": "http://178.238.223.39:8000/operett.m3u"
+    },
+    {
+        "name": "[HUN] radio-d.hu _ Jazz",
+        "logo": "logos/radio_d.png",
+        "url": "http://178.238.223.39:8000/jazz.m3u"
+    },
+    {
+        "name": "[HUN] radio-d.hu _ Musical",
+        "logo": "logos/radio_d.png",
+        "url": "http://178.238.223.39:8000/musical.m3u"
+    },
+    {
+        "name": "[HUN] radio-d.hu _ Magyar Nóta",
+        "logo": "logos/radio_d.png",
+        "url": "http://178.238.223.39:8000/magyarnota.m3u"
+    },
+    {
+        "name": "[HUN] radio-d.hu _ Gramofon",
+        "logo": "logos/radio_d.png",
+        "url": "http://178.238.223.39:8000/gramofon.m3u"
+    },
+    {
+        "name": "[HUN] radio-d.hu _ Klasszikusok",
+        "logo": "logos/radio_d.png",
+        "url": "http://178.238.223.39:8000/klasszikusok.m3u"
+    },
+    {
+        "name": "[HUN] radio-d.hu _ Könnyűzene",
+        "logo": "logos/radio_d.png",
+        "url": "http://178.238.223.39:8000/konnyuzene.m3u"
+    },
+    {
+        "name": "[HUN] radio-d.hu _ Swing",
+        "logo": "logos/radio_d.png",
+        "url": "http://178.238.223.39:8000/swing.m3u"
+    },
+    {
+        "name": "[HUN] radio-d.hu _ Táncdalok",
+        "logo": "logos/radio_d.png",
+        "url": "http://178.238.223.39:8000/tancdalok.m3u"
+    },
+    {
+        "name": "[HUN] radio-d.hu _ Made in Hungary",
+        "logo": "logos/radio_d.png",
+        "url": "http://178.238.223.39:8000/madeinhungary.m3u"
+    },
+    {
+        "name": "[HUN] #1 DANCEableRADIO",
+        "logo": "logos/dancenable.png",
+        "url": "http://s9.myradiostream.com:35944/listen.pls"
+    },
+    {
+        "name": "[HUN] -=RadioDabas=-",
+        "logo": "logos/radio_dabas.png",
+        "url": "http://stream3.virtualisan.net:7040/;"
+    },
+    {
+        "name": "[HUN] 97.7 Trio FM - Jászberény",
+        "logo": "logos/triofm.png",
+        "url": "http://92.119.123.141:9090/stream"
+    },
+    {
+        "name": "[HUN] 99.4 SunshineFM",
+        "logo": "logos/sunshinefm.png",
+        "url": "http://195.56.193.129:8100/sunshine"
+    },
+    {
+        "name": "[HUN] Sunshine Dance Mix",
+        "logo": "logos/sunshinefm.png",
+        "url": "http://195.56.193.129:8120/;stream/1?icy=http"
+    },
+    {
+        "name": "[HUN] Sunshine Pop",
+        "logo": "logos/sunshinefm.png",
+        "url": "http://195.56.193.129:8110/;stream/1?icy=http"
+    },
+    {
+        "name": "[HUN] ADN Rádió",
+        "logo": "logos/adn.png",
+        "url": "http://radio.adventnet.hu:8000/stream"
+    },
+    {
+        "name": "[HUN] Agnus Rádió 88.3MHz",
+        "logo": "logos/agnus.png",
+        "url": "http://193.6.173.58:8000/agnusradio"
+    },
+    {
+        "name": "[HUN] Aktiv Rádió Szolnok",
+        "logo": "logos/aktiv_szolnok.png",
+        "url": "http://aktivradio.hu:8000/aktiv.mp3"
+    },
+    {
+        "name": "[HUN] Alpha889",
+        "logo": "logos/alpha889.png",
+        "url": "https://radioe.net:8443/alpha_high"
+    },
+    {
+        "name": "[HUN] Bestlive-Music Rádió",
+        "logo": "logos/Bestlive_Music_Radio.png",
+        "url": "http://bestlive-music.net:2095/live.mp3"
+    },
+    {
+        "name": "[HUN] Bestlive-Music Rádió - Auto dj",
+        "logo": "logos/Bestlive_Music_Radio.png",
+        "url": "http://bestlive-music.net:2095/auto.mp3"
+    },
+    {
+        "name": "[HUN] Bestlive-Music Rádió - Retro auto dj",
+        "logo": "logos/Bestlive_Music_Radio.png",
+        "url": "http://bestlive-music.net:2095/retro_auto.mp3"
+    },
+    {
+        "name": "[HUN] Bestlive-Music Rádió - Rock auto dj [☠ROCK☠]",
+        "logo": "logos/Bestlive_Music_Radio.png",
+        "url": "http://bestlive-music.net:2095/rock.mp3"
+    },
+    {
+        "name": "[HUN]  euromusic",
+        "logo": "logos/euromusic.png",
+        "url": "https://a12.asurahosting.com/listen/euromusic/radio.mp3"
+    },
+    {
+        "name": "[HUN] MegaLive Rádió",
+        "logo": "logos/MegaLive_Radio.png",
+        "url": "https://mega-live.net:2053/live.mp3"
+    },
+    {
+        "name": "[HUN] Regina Rádió Győr",
+        "logo": "logos/Regina_Radio_Gyor.png",
+        "url": "http://cast1.asurahosting.com:443/proxy/zoltan1/stream"
+    },
+    {
+        "name": "[HUN] Balaton Rádió FM88.7",
+        "logo": "logos/balaton_radio887.png",
+        "url": "http://91.82.85.41:8200/;"
+    },
+    {
+        "name": "[HUN] Balatonica",
+        "logo": "logos/balatonica.png",
+        "url": "http://balatonica.hu:8000/stream_high"
+    },
+    {
+        "name": "[HUN] BASE FM",
+        "logo": "logos/basefm.png",
+        "url": "http://icast.connectmedia.hu/5401/live.mp3"
+    },
+    {
+        "name": "[HUN] Bati Rádió",
+        "logo": "logos/batiradio.jpg",
+        "url": "http://batiradiopop.asuscomm.com:8100/"
+    },
+    {
+        "name": "[HUN] BestFM 1",
+        "logo": "logos/bestfm.png",
+        "url": "http://stream1.webthings.hu:8000/fm95-x-128.mp3"
+    },
+    {
+        "name": "[HUN] Bias Rádió",
+        "logo": "logos/bias.png",
+        "url": "https://admin.biasradio.com:443/radio/8000/flac"
+    },
+    {
+        "name": "[HUN] Bithang Yoo Rádió",
+        "logo": "logos/bithangyoo.png",
+        "url": "http://stream.diazol.hu:35160/live.mp3"
+    },
+    {
+        "name": "[HUN] Budaőrs Rádió",
+        "logo": "logos/budaors.png",
+        "url": "https://stream.42netmedia.com:8443/budaorsradio"
+    },
+    {
+        "name": "[HUN] Callisto Rádió",
+        "logo": "logos/callisto.png",
+        "url": "http://188.165.11.30:4500/live.mp3"
+    },
+    {
+        "name": "[HUN] Campus Rádió FM90",
+        "logo": "logos/campus.png",
+        "url": "http://stream.fm90.hu:8000/;"
+    },
+    {
+        "name": "[HUN] Cegléd Rádió FM 92.5 MHz",
+        "logo": "logos/cegled925.png",
+        "url": "http://stream.cegledradio.hu:4387/mp3"
+    },
+    {
+        "name": "[HUN] CEU Medieval Rádió",
+        "logo": "logos/ceu.png",
+        "url": "http://137.74.85.85:7020/;stream"
+    },
+    {
+        "name": "[HUN] Civil Rádió",
+        "logo": "logos/civil.png",
+        "url": "http://civilradio.hu:8000/"
+    },
+    {
+        "name": "[HUN] Club Dance Online",
+        "logo": "logos/club_dance.png",
+        "url": "http://stream.clubdance.online:8000/live.ogg"
+    },
+    {
+        "name": "[HUN] Club Dance Online Retro",
+        "logo": "logos/club_dance_retro.jpg",
+        "url": "http://stream.clubdance.online:8000/retro"
+    },
+    {
+        "name": "[HUN] Csaba Rádió [Békéscsaba]",
+        "logo": "logos/csaba_radio.png",
+        "url": "http://csabaradio.hu:80/csabastream"
+    },
+    {
+        "name": "[HUN] CsillagpontRádió",
+        "logo": "logos/csillagpont.png",
+        "url": "http://streamer1.borsodweb.hu:48000/csillagpont"
+    },
+    {
+        "name": "[HUN] Dance Wave Retró",
+        "logo": "logos/dance_wave.png",
+        "url": "http://retro.dancewave.online/retrodance.flac.ogg"
+    },
+    {
+        "name": "[HUN] Dance Wave!",
+        "logo": "logos/dance_wave.png",
+        "url": "http://dancewave.online/dance.flac.ogg"
+    },
+    {
+        "name": "[HUN] Rádió Dikh",
+        "logo": "logos/dikh.png",
+        "url": "http://icast.connectmedia.hu/6121/live.mp3"
+    },
+    {
+        "name": "[HUN] Deja Vu Rádió Szeged",
+        "logo": "logos/dejavu.png",
+        "url": "http://carina.streamerr.co/stream/dejavuradio/dejavuradio"
+    },
+    {
+        "name": "[HUN] Disco Diamond Rádió Stream",
+        "logo": "logos/disco_diamond.png",
+        "url": "http://ddr2020.radioca.st/stream"
+    },
+    {
+        "name": "[HUN] Disco Diamond Rádió Stream",
+        "logo": "logos/disco_diamond.png",
+        "url": "http://discodiamond.radioca.st/stream"
+    },
+    {
+        "name": "[HUN] Disco Rádió",
+        "logo": "logos/radio.jpg",
+        "url": "http://stream11.shoutcastsolutions.com:8108/stream"
+    },
+    {
+        "name": "[HUN] DomBRádiO Dombrád AutoDJ",
+        "logo": "logos/dombradio.png",
+        "url": "http://dombradio.dyndns.tv:8000/live.mp3"
+    },
+    {
+        "name": "[HUN] Duna World Rádió",
+        "logo": "logos/dunaworld.png",
+        "url": "http://icast.connectmedia.hu/4760/dwr.aac"
+    },
+    {
+        "name": "[HUN] EBM Rádió. Budapest",
+        "logo": "logos/ebm_bp.png",
+        "url": "http://freestream.hu:8000/ebm_radio"
+    },
+    {
+        "name": "[HUN] EFM Station Enying",
+        "logo": "logos/efm.png",
+        "url": "http://radioe.net:8080/efm_hd"
+    },
+    {
+        "name": "[HUN] Erdélyi Magyar Rádió",
+        "logo": "logos/Erdelyi_Magyar_Radio.png",
+        "url": "https://adas.erdelyimagyarradio.eu:8443/emr"
+    },
+    {
+        "name": "[HUN] Esthajnal Rádió 2",
+        "logo": "logos/esthajnal.jpg",
+        "url": "http://radio.bekescomputer.hu:11000/autodj"
+    },
+    {
+        "name": "[HUN] Euphonic Moments Rádió",
+        "logo": "logos/euphonic.jpg",
+        "url": "http://5.189.174.137:8000/Euphonicmoments_radio256kbps.mp3"
+    },
+    {
+        "name": "[HUN] Ez az a nap! Rádió",
+        "logo": "logos/Ez_az_a_nap_Radio.png",
+        "url": "https://listen.radioking.com/radio/320174/stream/370600"
+    },
+    {
+        "name": "[HUN] Tempomax Rádió",
+        "logo": "logos/Tempomax_Radio.png",
+        "url": "http://94.23.169.250:2060/live.mp3"
+    },
+    {
+        "name": "[HUN] Fesztivál FM",
+        "logo": "logos/Fesztival_FM.png",
+        "url": "http://fesztivalfm.hu/stream_320k"
+    },
+    {
+        "name": "[HUN] FM 95.7 Rádió Pápa",
+        "logo": "logos/Radio_Papa.png",
+        "url": "https://s01.diazol.hu:9072/stream"
+    },
+    {
+        "name": "[HUN] Folkrádió",
+        "logo": "logos/Folkradio.png",
+        "url": "http://stream.folkradio.hu/folkradio.mp3"
+    },
+    {
+        "name": "[HUN] Forrás Média Rádió Budapest",
+        "logo": "logos/Forras_Media_Radio.png",
+        "url": "http://188.165.11.30:7000/"
+    },
+    {
+        "name": "[HUN] Forrás Rádió",
+        "logo": "logos/Forras_Radio.png",
+        "url": "http://91.82.85.44:1630/forrasradio.mp3"
+    },
+    {
+        "name": "[HUN] Fox Rádió Vajdaság",
+        "logo": "file://d:\\media\\audio\\0000 playlist\\logosFox_Radio.png",
+        "url": "http://stream.foxradio.rs:8545/;stream"
+    },
+    {
+        "name": "[HUN] Rádió88 Szeged FM 95.4",
+        "logo": "logos/radio88.png",
+        "url": "http://stream.radio88.hu/onair.mp3"
+    },
+    {
+        "name": "[HUN] Rádió88 Szeged FM 95.4 ENERGY",
+        "logo": "logos/radio88.png",
+        "url": "http://stream2.radio88.hu:8400/;stream"
+    },
+    {
+        "name": "[HUN] Rádió88 Szeged FM 95.4 LIGHT",
+        "logo": "logos/radio88.png",
+        "url": "http://stream3.radio88.hu:8500/;stream"
+    },
+    {
+        "name": "[HUN] Rádió88 Szeged FM 95.4 REPLAY",
+        "logo": "logos/radio88.png",
+        "url": "http://stream1.radio88.hu:8300/;stream"
+    },
+    {
+        "name": "[HUN] Rádió GROOVE",
+        "logo": "logos/groove_city.png",
+        "url": "http://radiogroove.hu/live.mp3"
+    },
+    {
+        "name": "VIBER +3670 21-99-400",
+        "logo": "logos/groove_city.png",
+        "url": "http://s03.diazol.hu:35110/live.mp3"
+    },
+    {
+        "name": "[HUN] Groove Cafe - Good vibes radio!",
+        "logo": "logos/groove_city.png",
+        "url": "http://s03.diazol.hu:35110/cafe.mp3"
+    },
+    {
+        "name": "[HUN] Groove City - Your greatest hits!",
+        "logo": "logos/groove_city.png",
+        "url": "http://s03.diazol.hu:35110/city.mp3"
+    },
+    {
+        "name": "[HUN] Groove Karacsony - Csak karacsonyi kedvencek [🎄Christmas🎄]",
+        "logo": "logos/groove_city.png",
+        "url": "http://s03.diazol.hu:35110/karacsony.mp3"
+    },
+    {
+        "name": "[HUN] Gyergyói Székely Rádió",
+        "logo": "logos/gyergyoi.szekely.radio.jpg",
+        "url": "http://szekelyradio.top:8000/;stream"
+    },
+    {
+        "name": "[HUN] Győr+ Rádió",
+        "logo": "logos/gyor+.png",
+        "url": "https://stream.42netmedia.com:8443/sc_gyor1"
+    },
+    {
+        "name": "[HUN] HiFiFm",
+        "logo": "logos/hififm.jpg",
+        "url": "https://cdn-node-44.hififm.hu:8080/stream001.mp3"
+    },
+    {
+        "name": "[HUN] Hit Rádió",
+        "logo": "logos/HIT_RaDIo.png",
+        "url": "https://streamer.radio.co:443/s47952d7c4/listen"
+    },
+    {
+        "name": "[HUN] Hobby Rádió",
+        "logo": "logos/Hobby_Radio.png",
+        "url": "http://hobbyradio.hu:8000/hobbyradio.mp3"
+    },
+    {
+        "name": "[HUN] Hujujuj Rádió",
+        "logo": "logos/HUJUJUJRADIO.png",
+        "url": "http://radionova.hujujuj.com:8000/main"
+    },
+    {
+        "name": "[HUN] I Love Pécs Rádió",
+        "logo": "logos/I_Love_Pecs_Radio.png",
+        "url": "http://radio.ilovepecs.hu:8200/ilp.mp3"
+    },
+    {
+        "name": "[HUN] InfóRádió - Hungary",
+        "logo": "logos/InfoRadio.png",
+        "url": "http://stream.infostart.hu/lejatszo/index.html?sid=1"
+    },
+    {
+        "name": "[HUN] Insane Rádió: iNSANE Auto Dj",
+        "logo": "logos/newinsane.jpg",
+        "url": "http://newinsane.info/ochi/insane.m3u"
+    },
+    {
+        "name": "[HUN] Jazzy",
+        "logo": "logos/jazzy.png",
+        "url": "http://radio.musorok.org/listen/jazzy/jazzy.mp3"
+    },
+    {
+        "name": "[HUN] Jazzy Cool",
+        "logo": "logos/jazzy.png",
+        "url": "http://radio.musorok.org/listen/jazzycool/jazzycool.mp3"
+    },
+    {
+        "name": "[HUN] Jazzy Groove",
+        "logo": "logos/jazzy.png",
+        "url": "http://radio.musorok.org/listen/jazzygroove/jazzygroove.mp3"
+    },
+    {
+        "name": "[HUN] Jazzy Soul",
+        "logo": "logos/jazzy.png",
+        "url": "http://radio.musorok.org/listen/jazzysoul/jazzysoul.mp3"
+    },
+    {
+        "name": "[HUN] Pázmány Rádió",
+        "logo": "logos/mkr.png",
+        "url": "https://katolikusradio.hu:8001/pazmany"
+    },
+    {
+        "name": "[HUN] Magyar Katolikus Rádió - Egyházzenei csatorna",
+        "logo": "logos/mkr.png",
+        "url": "https://katolikusradio.hu:8001/egyhazzene"
+    },
+    {
+        "name": "[HUN] Magyar Katolikus Rádió - Filmzenei csatorna",
+        "logo": "logos/mkr.png",
+        "url": "https://katolikusradio.hu:8001/filmzene_musical"
+    },
+    {
+        "name": "[HUN] Magyar Katolikus Rádió - Gyermekzenei csatorna",
+        "logo": "logos/mkr.png",
+        "url": "https://katolikusradio.hu:8001/gyermekzene"
+    },
+    {
+        "name": "[HUN] Magyar Katolikus Rádió - Jazz dixie csatorna",
+        "logo": "logos/mkr.png",
+        "url": "https://katolikusradio.hu:8001/jazz_dixie"
+    },
+    {
+        "name": "[HUN] Magyar Katolikus Rádió - Komolyzenei csatorna",
+        "logo": "logos/mkr.png",
+        "url": "https://katolikusradio.hu:8001/komolyzene"
+    },
+    {
+        "name": "[HUN] Magyar Katolikus Rádió - Könnyűzenei csatorna",
+        "logo": "logos/mkr.png",
+        "url": "https://katolikusradio.hu:8001/konnyuzene"
+    },
+    {
+        "name": "[HUN] Magyar Katolikus Rádió - Népzenei csatorna",
+        "logo": "logos/mkr.png",
+        "url": "https://katolikusradio.hu:8001/nepzene"
+    },
+    {
+        "name": "[HUN] Magyar Katolikus Rádió - Opera csatorna",
+        "logo": "logos/mkr.png",
+        "url": "https://katolikusradio.hu:8001/opera"
+    },
+    {
+        "name": "[HUN] Magyar Katolikus Rádió - Világzenei csatorna",
+        "logo": "logos/mkr.png",
+        "url": "https://katolikusradio.hu:8001/vilagzene"
+    },
+    {
+        "name": "[HUN] Magyar Katolikus Rádió - Élő adás",
+        "logo": "logos/mkr.png",
+        "url": "http://katolikusradio.hu:9000/live_hi.mp3"
+    },
+    {
+        "name": "[HUN] Tilos Rádió - Digital",
+        "logo": "logos/Tilos.png",
+        "url": "http://stream.tilos.hu/digital"
+    },
+    {
+        "name": "[HUN] Tilos Rádió - Channel 1 :: chill/eclectic :: karolyimusic.com - Eclectic electronica mostly chill/psychill",
+        "logo": "logos/Tilos.png",
+        "url": "http://stream.tilos.hu/karolyi-chill-eclectic"
+    },
+    {
+        "name": "[HUN] Tilos Rádió - Channel 2 :: breaks/dnb/psytrance/house/party music :: karolyimusic.com",
+        "logo": "logos/Tilos.png",
+        "url": "http://stream.tilos.hu/karolyi-breaks-dnb"
+    },
+    {
+        "name": "[HUN] Tilos Rádió - Channel 3 :: mixes :: karolyimusic.com - All mixes from https://mixcloud.com/karolyi and mor",
+        "logo": "logos/Tilos.png",
+        "url": "http://stream.tilos.hu/karolyi-mixes"
+    },
+    {
+        "name": "[HUN] Tilos Rádió -/djpalotai - Tilos Rádió - djpalotai",
+        "logo": "logos/Tilos.png",
+        "url": "http://stream.tilos.hu/djpalotai"
+    },
+    {
+        "name": "[HUN] Tilos Rádió -/jazzisdead - Jazz is Dead?",
+        "logo": "logos/Tilos.png",
+        "url": "http://stream.tilos.hu/jazzisdead"
+    },
+    {
+        "name": "[HUN] Tilos Rádió -/mese - Tilos Mese Rádió",
+        "logo": "logos/Tilos.png",
+        "url": "http://stream.tilos.hu/mese"
+    },
+    {
+        "name": "[HUN] Tilos Rádió -/szöveg - Tilos Szöveges Rádió",
+        "logo": "logos/Tilos.png",
+        "url": "http://stream.tilos.hu/szoveg"
+    },
+    {
+        "name": "[HUN] Tordas Rádió",
+        "logo": "logos/Tilos.png",
+        "url": "http://stream.tilos.hu:80/tordas_radio_online"
+    },
+    {
+        "name": "[HUN] MegaDance Rádió .MegaMixer",
+        "logo": "logos/MegaDance_Radio.png",
+        "url": "http://gamershouse.hu:8000/livemega.mp3"
+    },
+    {
+        "name": "[HUN] Joy Hits",
+        "logo": "logos/joy_hits.png",
+        "url": "https://joyhits.online/joyhits.flac.ogg"
+    },
+    {
+        "name": "[HUN] Klasszik rádió",
+        "logo": "logos/klasszik_radio.png",
+        "url": "https://www.klasszikradio.hu/klasszik.mp3"
+    },
+    {
+        "name": "[HUN] Kolozsvári Rádió",
+        "logo": "logos/kolozsvari_radio.png",
+        "url": "http://89.238.227.6:8386/"
+    },
+    {
+        "name": "[HUN] Körmend Fm",
+        "logo": "logos/kormend_fm.png",
+        "url": "http://online.kormendfm.hu/kormendlive"
+    },
+    {
+        "name": "[HUN] KORONAfm100",
+        "logo": "logos/KORONAfm100.png",
+        "url": "http://82.141.165.6:8000/;stream"
+    },
+    {
+        "name": "[HUN] Korona Rádió Brasso",
+        "logo": "logos/Korona_Radio_Brasso.png",
+        "url": "http://s7.citrus3.com:8022/stream"
+    },
+    {
+        "name": "[HUN] kultX",
+        "logo": "logos/kultx.jpg",
+        "url": "http://mediagw.e-tiger.net/stream/krehq"
+    },
+    {
+        "name": "[HUN] Lahmacun Rádió",
+        "logo": "logos/lahmacum.jpg",
+        "url": "http://streaming.lahmacun.hu/listen/lahmacun_radio/radio.mp3"
+    },
+    {
+        "name": "[HUN] Lakihegy Rádió Online",
+        "logo": "logos/Lakihegy_Radio.png",
+        "url": "http://stream.composeit.hu:8300/lakihegy"
+    },
+    {
+        "name": "[HUN] Lépés Rádió",
+        "logo": "logos/Lepes_Radio.png",
+        "url": "http://lepesradio.hu/live.mp3"
+    },
+    {
+        "name": "[HUN] Luxfunk Dance",
+        "logo": "logos/Luxfunk_Radio.png",
+        "url": "http://luxfunkbroadcast.com/proxy/luxfunkdance/stream"
+    },
+    {
+        "name": "[HUN] Luxfunk Radio",
+        "logo": "logos/Luxfunk_Radio.png",
+        "url": "http://luxfunkbroadcast.com/proxy/luxfunkradio/stream"
+    },
+    {
+        "name": "[HUN] Luxfunk® Blackmix",
+        "logo": "logos/Luxfunk_Radio.png",
+        "url": "http://luxfunkbroadcast.com/proxy/luxfunkblackmix/stream"
+    },
+    {
+        "name": "[HUN] Magic Disco Rádió Ami elvarázsol!",
+        "logo": "logos/Magic_Disco_Radio.png",
+        "url": "http://178.238.212.164:4420/live.mp3"
+    },
+    {
+        "name": "[HUN] Manna Fm 98.6 MHz",
+        "logo": "logos/Manna_FM.png",
+        "url": "http://icast.connectmedia.hu/4780/live.mp3"
+    },
+    {
+        "name": "[HUN] MAXIRADIO Gyöngyös 92.4 Mhz",
+        "logo": "logos/MaxiRadio.png",
+        "url": "http://46.107.212.101:9240/live"
+    },
+    {
+        "name": "[HUN] MegafonFM",
+        "logo": "logos/Megafon.png",
+        "url": "http://78.131.58.127:8000/stream"
+    },
+    {
+        "name": "[HUN] MixRádió",
+        "logo": "logos/MixRadio.png",
+        "url": "https://stream.phost.hu:8006/live"
+    },
+    {
+        "name": "[HUN] MixRadio Creamix - NON-STOP SUMMER MUSIC",
+        "logo": "logos/MixRadio.png",
+        "url": "https://stream.phost.hu:8010/creamix"
+    },
+    {
+        "name": "[HUN] MixRadio RETRO",
+        "logo": "logos/MixRadio.png",
+        "url": "https://stream.phost.hu:8004/retro"
+    },
+    {
+        "name": "[HUN] MixRádió - ChristMix",
+        "logo": "logos/MixRadio.png",
+        "url": "https://stream.phost.hu:8018/christmix"
+    },
+    {
+        "name": "[HUN] iceGold Radio",
+        "logo": "logos/icegold.png",
+        "url": "http://stream.icegold.pro:8000/stream.mp3"
+    },
+    {
+        "name": "[HUN] Muravidéki Magyar Rádió",
+        "logo": "logos/Muravideki_Magyar_Radio.png",
+        "url": "http://mp3.rtvslo.si:80/mmr"
+    },
+    {
+        "name": "[HUN] Mustár FM",
+        "logo": "logos/Mustar_FM.png",
+        "url": "http://193.138.125.14:8500/"
+    },
+    {
+        "name": "[HUN] N-music Online",
+        "logo": "logos/N_music_Online.jpg",
+        "url": "http://stream.n-music.tk:8000/"
+    },
+    {
+        "name": "[HUN] Netadó Rádió",
+        "logo": "logos/Netado_Radio.png",
+        "url": "http://217.13.101.70:8010/netadoradio.mp3"
+    },
+    {
+        "name": "[HUN] NextFM",
+        "logo": "logos/Next_FM.png",
+        "url": "http://stream.nextfm.hu/radio/8000/nextfmhu.mp3"
+    },
+    {
+        "name": "[HUN] Szabadkai Magyar Rádió",
+        "logo": "logos/Szabadkai_Magyar_Radio.png",
+        "url": "http://stream2.nmih.hu:4112/live.mp3"
+    },
+    {
+        "name": "[HUN] Pannon Rádió",
+        "logo": "logos/Pannon_Radio.png",
+        "url": "https://stream2.nmih.hu:4122/live.mp3"
+    },
+    {
+        "name": "[HUN] Poptarisznya.hu - A Retro netradio",
+        "logo": "logos/Poptarisznya.png",
+        "url": "http://188.165.11.30:8200/live.mp3"
+    },
+    {
+        "name": "[HUN] Poptarisznya rRadio - Blues csatorna",
+        "logo": "logos/Poptarisznya.png",
+        "url": "http://188.165.11.30:8200/blues.mp3"
+    },
+    {
+        "name": "[HUN] Poptarisznya.hu - A Retro netradio",
+        "logo": "logos/Poptarisznya.png",
+        "url": "http://188.165.11.30:8200/oldies.mp3"
+    },
+    {
+        "name": "[HUN] Online Rádió",
+        "logo": "logos/radio.jpg",
+        "url": "http://eu10.fastcast4u.com:2200/;"
+    },
+    {
+        "name": "[HUN] OurVision FM Magyarország",
+        "logo": "logos/OurVision_FM_Magyarorszag.png",
+        "url": "http://icast.connectmedia.hu/4801/live.mp3"
+    },
+    {
+        "name": "[HUN] Ozone FM",
+        "logo": "logos/oxygen.png",
+        "url": "https://oxygenmusic.hu:8443/ozonefm_320"
+    },
+    {
+        "name": "[HUN] PACSIRTA",
+        "logo": "logos/Hangulat_Radio.png",
+        "url": "http://79.139.60.24:8000/pacsirta"
+    },
+    {
+        "name": "[HUN] HlT FM",
+        "logo": "logos/Hangulat_Radio.png",
+        "url": "http://79.139.60.24:8000/hitfm"
+    },
+    {
+        "name": "[HUN] JAMPEC",
+        "logo": "logos/Hangulat_Radio.png",
+        "url": "http://79.139.60.24:8000/jampec"
+    },
+    {
+        "name": "[HUN] MlX FM",
+        "logo": "logos/Hangulat_Radio.png",
+        "url": "http://79.139.60.24:8000/mixfm"
+    },
+    {
+        "name": "[HUN] MlXOTEKA",
+        "logo": "logos/Hangulat_Radio.png",
+        "url": "http://79.139.60.24:8000/mixoteka"
+    },
+    {
+        "name": "[HUN] TEL*STAR",
+        "logo": "logos/Hangulat_Radio.png",
+        "url": "http://79.139.60.24:8000/telstar"
+    },
+    {
+        "name": "[HUN] Paks FM",
+        "logo": "logos/Paks_FM.png",
+        "url": "http://str2.42net.hu:8000/paks_fm"
+    },
+    {
+        "name": "[HUN] Panda Rádió Szeged",
+        "logo": "logos/Panda_Radio_Szeged.png",
+        "url": "http://stream.pandaradio.rs/pandaradio.ogg"
+    },
+    {
+        "name": "[HUN] Pannónia Rádió",
+        "logo": "logos/Pannonia_Radio.png",
+        "url": "http://ip157.ozelip.com/8130/stream"
+    },
+    {
+        "name": "[HUN] Park FM",
+        "logo": "logos/ParkFM.png",
+        "url": "http://s03.diazol.hu:7142/stream.mp3"
+    },
+    {
+        "name": "[HUN] Pécs Aktuál Rádió",
+        "logo": "logos/Pecs_Aktual_Radio.png",
+        "url": "http://stream.pecsaktual.hu/paradio.mp3"
+    },
+    {
+        "name": "[HUN] Periszkóp Rádió",
+        "logo": "logos/Periszkop_Rado.png",
+        "url": "https://mumia.periszkopradio.hu:8443/;stream.mp3"
+    },
+    {
+        "name": "[HUN] Pulzus FM 92.1",
+        "logo": "logos/Pulzus_FM_92.1.png",
+        "url": "http://radio2.tirek.hu:8000/sionelo"
+    },
+    {
+        "name": "[HUN] Rádió 24",
+        "logo": "logos/Radio_24.png",
+        "url": "http://s01.diazol.hu:10102/live.mp3"
+    },
+    {
+        "name": "[HUN] Rádió 47 Orosháza",
+        "logo": "logos/Radio_47_Oroshaza.png",
+        "url": "http://s01.diazol.hu:9102/live.mp3"
+    },
+    {
+        "name": "[HUN] Rádió 7",
+        "logo": "logos/Radio_7.png",
+        "url": "http://netradio.radio7.hu:8300/stream.mp3"
+    },
+    {
+        "name": "[HUN] Rádió Ada . Adai Rádió",
+        "logo": "logos/Radio_Ada.png",
+        "url": "http://audio.radioada.rs:9010/stream"
+    },
+    {
+        "name": "[HUN] Rádió Antritt",
+        "logo": "logos/Radio_Antritt.png",
+        "url": "http://stream.radioantritt.hu:8000/Antritt"
+    },
+    {
+        "name": "[HUN] Rádió B. Slágerek 70-es évektől napjainkig",
+        "logo": "logos/Radio_B.png",
+        "url": "http://radiob.dyndns.org:8000/high"
+    },
+    {
+        "name": "[HUN] Rádió Bézs",
+        "logo": "logos/Radio_Bezs.png",
+        "url": "http://195.210.29.82:8001/bezs"
+    },
+    {
+        "name": "[HUN] Rádió Bézs 2",
+        "logo": "logos/Radio_Bezs.png",
+        "url": "http://195.210.29.82:8002/bezs2"
+    },
+    {
+        "name": "[HUN] Radio Brand",
+        "logo": "logos/Radio_Brand.png",
+        "url": "http://radiobrand.es:8084/"
+    },
+    {
+        "name": "[HUN] RADIO ED",
+        "logo": "logos/RADIO_ED.png",
+        "url": "http://a3.asurahosting.com:6430/radio.mp3"
+    },
+    {
+        "name": "[HUN] Radio Holy Doctor",
+        "logo": "logos/Radio_Holy_Doctor.png",
+        "url": "http://streaming.radioholydoctor.com/radio/8010/radio.mp3"
+    },
+    {
+        "name": "[HUN] Rádió Ice",
+        "logo": "logos/Radio_Ice.png",
+        "url": "http://radioice.ddns.net:8000/ice"
+    },
+    {
+        "name": "[HUN] RADIO INSIDE",
+        "logo": "logos/RADIO_INSIDE.png",
+        "url": "http://radioinside.eu/high.mp3"
+    },
+    {
+        "name": "[HUN] Rádió Keve",
+        "logo": "logos/Radio_Keve.png",
+        "url": "http://s02.diazol.hu:10260/stream"
+    },
+    {
+        "name": "[HUN] Rádió MORA",
+        "logo": "logos/Radio_MORA.png",
+        "url": "http://server4.streamserver24.com:26253/;"
+    },
+    {
+        "name": "[HUN] Rádió Most - Kaposvár (FM 91.2 MHz)",
+        "logo": "logos/Radio_Most.png",
+        "url": "http://stream.radiomost.hu:8200/live.mp3"
+    },
+    {
+        "name": "[HUN] Rádió Smile",
+        "logo": "logos/Radio_Smile.png",
+        "url": "http://smile.str.42net.hu/stream/;"
+    },
+    {
+        "name": "[HUN] Rádió Szarvas",
+        "logo": "logos/Radio_Szarvas.png",
+        "url": "http://91.82.85.44:1630/radioszarvas.mp3"
+    },
+    {
+        "name": "[HUN] Radio X Hungary",
+        "logo": "logos/Radio_X.png",
+        "url": "https://streamradiox.hu:8400/live2.mp3"
+    },
+    {
+        "name": "[HUN] Rádió 97",
+        "logo": "logos/Radio_97.png",
+        "url": "http://46.249.154.54:8000/live"
+    },
+    {
+        "name": "[HUN] Zenekoktél Rádió",
+        "logo": "logos/Zenekoktel_Radio.png",
+        "url": "http://s02.diazol.hu:10182/stream"
+    },
+    {
+        "name": "[HUN] Rádió Sansz . A LEHETŐSÉG!",
+        "logo": "logos/Radio_Sansz.png",
+        "url": "http://91.82.85.44:1630/radiosansz_03.mp3"
+    },
+    {
+        "name": "[HUN] radiOzora Trance",
+        "logo": "logos/radiozora.jpg",
+        "url": "http://trance.out.airtime.pro:8000/trance_a"
+    },
+    {
+        "name": "[HUN] radiOzora Chill",
+        "logo": "logos/radiozora.jpg",
+        "url": "http://chill.out.airtime.pro/chill_a"
+    },
+    {
+        "name": "[HUN] Raptér online rádió - HungaRap",
+        "logo": "logos/Rapter.png",
+        "url": "http://stream.rapter.hu/rapter.mp3"
+    },
+    {
+        "name": "[HUN] Sárvár Rádió",
+        "logo": "logos/Sarvar_Radio.png",
+        "url": "https://stream.42netmedia.com:8443/sarvar"
+    },
+    {
+        "name": "[HUN] Siculus Rádió Kézdivásárhely 95MHz",
+        "logo": "logos/Siculus_Radio.png",
+        "url": "http://46.214.17.202:8000/radioac3"
+    },
+    {
+        "name": "[HUN] Spirit FM",
+        "logo": "logos/Spirit_FM.png",
+        "url": "http://s01.diazol.hu:10050/spweb1.mp3"
+    },
+    {
+        "name": "[HUN] Start Rádió",
+        "logo": "logos/Start_Radio.png",
+        "url": "http://online.startradio.hu/start.mp3"
+    },
+    {
+        "name": "[HUN] SuperDj Rádió",
+        "logo": "logos/SuperDj_Radio.png",
+        "url": "http://stream.diazol.hu:35150/stream"
+    },
+    {
+        "name": "[HUN] Szent Istvan Rádió",
+        "logo": "logos/Szent_Istvan_Radio.png",
+        "url": "http://online.szentistvanradio.hu:7000/adas"
+    },
+    {
+        "name": "[HUN] Szent Korona Rádió SZKR Forras",
+        "logo": "logos/Szent_Korona_Radio.png",
+        "url": "http://szkrcast.ddns.net/radio/8010/radio.mp3"
+    },
+    {
+        "name": "[HUN] Szent Korona Rádió SZKR Original",
+        "logo": "logos/Szent_Korona_Radio.png",
+        "url": "http://szkrcast.ddns.net/radio/8000/radio.mp3"
+    },
+    {
+        "name": "[HUN] Sztráda Rádió",
+        "logo": "logos/Sztrada_Radio.png",
+        "url": "http://s03.diazol.hu:35080/live.mp3"
+    },
+    {
+        "name": "[HUN] Szünet Rádió - Kimaxoljuk a napodat! hq.mp3",
+        "logo": "logos/Szunet_Radio.png",
+        "url": "http://stream.szunetrad.io/listen/szunetradio/stream_hq.mp3"
+    },
+    {
+        "name": "[HUN] Tamási Rádió",
+        "logo": "logos/Tamasi_Radio.png",
+        "url": "https://stream.42netmedia.com:8443/sc_tamas"
+    },
+    {
+        "name": "[HUN] Táska Rádió",
+        "logo": "logos/Taska_Radio.png",
+        "url": "http://live.taskaradio.com:7070/;stream.nsv#.mp3"
+    },
+    {
+        "name": "[HUN] Tempomax Rádió",
+        "logo": "logos/Tempomax_Radio.png",
+        "url": "http://stream1.virtualisan.net/prx/4810/live.mp3"
+    },
+    {
+        "name": "[HUN] Vajdaságretró",
+        "logo": "logos/Vajdasagretro.png",
+        "url": "http://sp1.19cloudsnetwork.gr/8032/stream"
+    },
+    {
+        "name": "[HUN] Vértes Center [Tatabanya]",
+        "logo": "logos/Vertes_Center.jpg",
+        "url": "http://streamhost110.gtk.hu:9418/;stream"
+    },
+    {
+        "name": "[HUN] Vörösmarty Rádió",
+        "logo": "logos/Vorosmarty_Radio.png",
+        "url": "https://cloudfront41.lexanetwork.com:7604/livestream.mp3"
+    },
+    {
+        "name": "[HUN] Xbeat",
+        "logo": "logos/coolfm.png",
+        "url": "http://mediagw.e-tiger.net/stream/xbeathq"
+    },
+    {
+        "name": "[HUN] Zaradio",
+        "logo": "logos/Zaradio.png",
+        "url": "https://stream.zaradio.hu:443/zara.mp3"
+    },
+    {
+        "name": "[HUN] Zebrádió",
+        "logo": "logos/Zebradio.png",
+        "url": "https://stream.zebradio.hu:8443/zebradio"
+    },
+    {
+        "name": "[HUN] ZugRádió",
+        "logo": "logos/ZugRadio.png",
+        "url": "http://zuglofm.netregator.hu:7812/sambc.mp3"
+    },
+    {
+        "name": "[HUN] All-Star Rádió 70's Disco",
+        "logo": "logos/All_Star_Radio.png",
+        "url": "https://a2.asurahosting.com:7620/radio.mp3"
+    },
+    {
+        "name": "[HUN] All-Star Rádió 80's Disco",
+        "logo": "logos/All_Star_Radio.png",
+        "url": "http://a3.asurahosting.com:7500/radio.mp3"
+    },
+    {
+        "name": "[HUN] Shine FM Rádió Gyula",
+        "logo": "logos/Shine_FM_Radio.png",
+        "url": "https://s01.diazol.hu:10042/stream/;"
+    },
+    {
+        "name": "[HUN] NST Music FM",
+        "logo": "logos/NST_Music_FM.png",
+        "url": "http://free.rcast.net/70948"
+    },
+    {
+        "name": "[HUN] Best Music Rádió",
+        "logo": "logos/Best_Music_Radio.png",
+        "url": "http://a2.asurahosting.com/listen/best_music_radio/radio.mp3"
+    },
+    {
+        "name": "[HUN] DFM Rádió - VIBER: +36-70-274-46-46",
+        "logo": "logos/DFM_RADIO.png",
+        "url": "http://s03.diazol.hu:7040/stream"
+    },
+    {
+        "name": "[HUN] Ördögi Angyal Rádió",
+        "logo": "logos/Ordogi_Angyal_Radio.jpg",
+        "url": "http://188.165.11.30:4130/live.mp3"
+    },
+    {
+        "name": "[HUN] Energy Music Rádió (Hungary)",
+        "logo": "logos/Energy_Music_Radio_Hungary.png",
+        "url": "http://cast5.my-control-panel.com:8135/live"
+    },
+    {
+        "name": "[HUN] Egerszeg Rádió",
+        "logo": "logos/Egerszeg_Radio.png",
+        "url": "http://egerszeg.str.42net.hu:9310/stream"
+    },
+    {
+        "name": "[HUN] RDJ - Rádió Dj Nagykanizsa",
+        "logo": "logos/RDJ_Radio_Dj_Nagykanizsa.jpg",
+        "url": "http://s03.diazol.hu:7000/live.mp3"
+    },
+    {
+        "name": "[HUN] Érd FM 101.3",
+        "logo": "logos/erd_FM.png",
+        "url": "http://s01.diazol.hu:9002/stream"
+    },
+    {
+        "name": "[HUN] Erdélyi Magyar Rádió",
+        "logo": "logos/Erdelyi_Magyar_Radio.png",
+        "url": "http://s02.diazol.hu:9000/stream"
+    },
+    {
+        "name": "[HUN] Gold FM Rádió - Generációk kedvenc Slágerei",
+        "logo": "logos/Gold_FM_Radio.png",
+        "url": "http://a10.asurahosting.com:7760/radio.mp3"
+    },
+    {
+        "name": "[HUN] Halas Rádió",
+        "logo": "logos/Halas_Radio.png",
+        "url": "http://halas.str.42net.hu:8008/stream"
+    },
+    {
+        "name": "[HUN] X Music - Groove Culture",
+        "logo": "logos/xmusic.jpg",
+        "url": "http://ip169.ozelip.com/7774/stream"
+    },
+    {
+        "name": "[HUN] Just4Music Rádió.....Csak neked....  Miskolc online rádió",
+        "logo": "logos/Just4Music.png",
+        "url": "http://c38.radioboss.fm:8144/stream"
+    },
+    {
+        "name": "[HUN] Közös Hang Rádió",
+        "logo": "logos/Kozos_Hang_Radio.png",
+        "url": "http://netalap.hu:8015/radio.mp3"
+    },
+    {
+        "name": "[HUN] MPM Radio",
+        "logo": "logos/MPM_Radio.png",
+        "url": "http://193.39.15.81:8000/mpm-med-ogg"
+    },
+    {
+        "name": "[HUN] Rábaköz Rádió",
+        "logo": "logos/Rabakoz_Radio.png",
+        "url": "http://radio.molnarkft.hu/rabakozradio"
+    },
+    {
+        "name": "[HUN] Radio KoKo",
+        "logo": "logos/Radio_Koko.png",
+        "url": "http://az10.yesstreaming.net:8210/radiokoko"
+    },
+    {
+        "name": "[HUN] Rádió Pole Pozició - Autó- motorsport felturbózva a legjobb zenékkel",
+        "logo": "logos/Radio_Pole_Pozício.png",
+        "url": "http://s3.radio.co/s7c5eb8f8e/listen"
+    },
+    {
+        "name": "[HUN] Régió Rádió",
+        "logo": "logos/Regio_Radio.png",
+        "url": "http://stream.regioradio.info:8000/radio.mp3"
+    },
+    {
+        "name": "[HUN] Trimedio Rádió",
+        "logo": "logos/Trimedio_Radio.png",
+        "url": "http://stream.streaming4u.hu:8000/TrimedioRadio"
+    },
+    {
+        "name": "[HUN] Rádió Patria",
+        "logo": "logos/Patria_Radio.png",
+        "url": "http://live.slovakradio.sk:8000/Patria_256.mp3"
+    },
+    {
+        "name": "[HUN] Karcag FM",
+        "logo": "logos/Karcag_FM.png",
+        "url": "http://cloudfront41.lexanetwork.com:7200/livestream.mp3"
+    },
+    {
+        "name": "[HUN] Dunakanyar Rádió",
+        "logo": "logos/Dunakanyar_Radio.png",
+        "url": "https://streaming4u.synology.me:8443/DunakanyarFM"
+    },
+    {
+        "name": "[HUN] Galaxis Rádió",
+        "logo": "logos/Galaxis_Radio.png",
+        "url": "http://s01.diazol.hu:9132/stream"
+    },
+    {
+        "name": "[HUN] Bridge FM Hungary",
+        "logo": "logos/Bridge_fm_Hungary.png",
+        "url": "http://radio.freestream.hu:8240/stream"
+    },
+    {
+        "name": "[HUN] Club7 Rádió",
+        "logo": "logos/club7_radio.jpg",
+        "url": "http://icast.club7radio.hu:7050/stream"
+    },
+    {
+        "name": "[HUN] Deejay Radio",
+        "logo": "logos/Deejay_Radio.png",
+        "url": "http://s01.diazol.hu:9042/stream"
+    },
+    {
+        "name": "[HUN] Erdély FM",
+        "logo": "logos/Erdely_FM.png",
+        "url": "https://efm.radioca.st:443/live"
+    },
+    {
+        "name": "[HUN] Radio Selection",
+        "logo": "logos/radio_selection.jpg",
+        "url": "http://s01.diazol.hu:9030/stream"
+    },
+    {
+        "name": "[HUN] Cherry Music Rádió",
+        "logo": "logos/CherryMusicRadio.jpg",
+        "url": "http://s01.diazol.hu:9090/stream"
+    },
+    {
+        "name": "[HUN] no name",
+        "logo": "logos/radio.jpg",
+        "url": "http://hydra.shoutca.st:8011/live"
+    },
+    {
+        "name": "[HUN] Topfm Nyíregyháza",
+        "logo": "logos/Topfm_Nyíregyhaza.png",
+        "url": "http://s02.diazol.hu:10010/stream"
+    },
+    {
+        "name": "[HUN] Argentine Tangó Rádió",
+        "logo": "logos/radio.jpg",
+        "url": "http://ais-edge94-nyc04.cdnstream.com/2202_128.mp3"
+    },
+    {
+        "name": "[HUN] auto dj",
+        "logo": "logos/radio.jpg",
+        "url": "http://188.165.11.30:4260/live.mp3"
+    },
+    {
+        "name": "[HUN] City Rádió Szatmár",
+        "logo": "logos/city_ro.png",
+        "url": "http://mscp1.gazduireradio.ro/cityradio"
+    },
+    {
+        "name": "[HUN] Fun FM",
+        "logo": "logos/FunFM.ro.png",
+        "url": "http://online.funfm.ro:8000/funfm.mp3"
+    },
+    {
+        "name": "[HUN] Kiss Fm",
+        "logo": "logos/kissfm.png",
+        "url": "https://live.kissfm.ro:443/onefm.aacp"
+    },
+    {
+        "name": "[HUN] Plusz FM - Nagyvárad",
+        "logo": "logos/Plusz_FM.png",
+        "url": "http://stream2.radiotransilvania.ro/Nagyvarad"
+    },
+    {
+        "name": "[HUN] Plusz FM - Margitta",
+        "logo": "logos/Plusz_FM.png",
+        "url": "http://stream2.radiotransilvania.ro/Margitta"
+    },
+    {
+        "name": "[HUN] Paprika Rádió 95.1 FM [Kolozsvár]",
+        "logo": "logos/Paprika_Radio.png",
+        "url": "http://stream1.paprikaradio.ro:8000/;stream"
+    },
+    {
+        "name": "[HUN] Radio Electro Manele",
+        "logo": "logos/Radio_Electro_Manele.png",
+        "url": "http://sonic1-rbx.cloud-center.ro:8046/stream"
+    },
+    {
+        "name": "[HUN] Marosvásárhelyi Rádió . Radio Neumarkt",
+        "logo": "logos/Marosvasarhelyi_Radio.png",
+        "url": "http://streaming.radiomures.ro:8312/"
+    },
+    {
+        "name": "[HUN] Retro Radio [ro]",
+        "logo": "logos/Retro_Radioro.png",
+        "url": "http://online.radioretro.ro:8002/RetroRadio.mp3"
+    },
+    {
+        "name": "[HUN] Radio Vocea Sperantei",
+        "logo": "logos/Radio_Vocea_Sperantei.jpg",
+        "url": "http://live.rvs.ro/mg"
+    },
+    {
+        "name": "[HUN] Szépvíz FM",
+        "logo": "logos/Szepvíz_FM.png",
+        "url": "https://szepvizfm.ro:8000/stream"
+    },
+    {
+        "name": "[HUN] VoxFM 88.6",
+        "logo": "logos/VoxFM.png",
+        "url": "http://stream.voxfm.ro:8000/stream/1"
+    },
+    {
+        "name": "[HUN] Csángó Rádió - Radioul ceangailor",
+        "logo": "logos/Csango_Radio.png",
+        "url": "http://radio.sonicpanel.ro:8082/stream"
+    },
+    {
+        "name": "[HUN] Star Rádió",
+        "logo": "logos/Star_Radio.png",
+        "url": "http://online.webcastradio.ro/star"
+    },
+    {
+        "name": "[HUN] Best Dance Rádió",
+        "logo": "logos/Best_Dance_Radio.png",
+        "url": "http://sonic1-rbx.cloud-center.ro/8018/;"
+    },
+    {
+        "name": "[HUN] Székely kocsma",
+        "logo": "logos/Szekely_kocsma.jpg",
+        "url": "http://ssl.kenhost.ro:8004/stream"
+    },
+    {
+        "name": "[HUN] MRE Backup Stream",
+        "logo": "logos/Maria.png",
+        "url": "http://stream.mariaradio.ro:8000/MRE_Backup"
+    },
+    {
+        "name": "[HUN] Royal rádió - Rádiójátékok irodalom hangoskönyvek",
+        "logo": "logos/Royal_radio.png",
+        "url": "http://icecast.netalap.hu:8000/royal.mp3"
+    },
+    {
+        "name": "[HUN] Rádió Comedy >> kabaré humor nevetés",
+        "logo": "logos/Radio_Comedy.png",
+        "url": "http://a7.asurahosting.com:8430/radio.mp3"
+    },
+    {
+        "name": "[HUN] Röhej Rádió",
+        "logo": "logos/Rohej_Radio.png",
+        "url": "http://listen.radioking.com/radio/641950/stream/704998"
+    },
+    {
+        "name": "[HUN] Momo Gyerekrádió",
+        "logo": "logos/momo.png",
+        "url": "http://s03.diazol.hu:7092/zene.mp3"
+    },
+    {
+        "name": "[HUN] Momo Gyerekrádió  Momo Live",
+        "logo": "logos/momo.png",
+        "url": "http://s03.diazol.hu:7092/mese.mp3"
+    },
+    {
+        "name": "[HUN] Csukás Meserádió",
+        "logo": "logos/Csukas_Meseradio.png",
+        "url": "http://mr-stream.connectmedia.hu/4611/mr10.mp3"
+    },
+    {
+        "name": "[HUN] Kossúth Rádió",
+        "logo": "logos/Kossuth_Radio.png",
+        "url": "https://icast.connectmedia.hu/4736/mr1.mp3"
+    },
+    {
+        "name": "[HUN] Petőfi Rádió",
+        "logo": "logos/Petofi_Radio.png",
+        "url": "https://icast.connectmedia.hu/4738/mr2.mp3"
+    },
+    {
+        "name": "[HUN] Bartók Rádió",
+        "logo": "logos/bartok.png",
+        "url": "https://mr-stream.connectmedia.hu/4741/mr3.mp3"
+    },
+    {
+        "name": "[HUN] Nemzetiségi adások",
+        "logo": "logos/Nemzetisegi_adasok.png",
+        "url": "http://icast.connectmedia.hu/4743/mr4.aac"
+    },
+    {
+        "name": "[HUN] Parlamenti adások Magyar Rádió",
+        "logo": "logos/Parlamenti_adasok.png",
+        "url": "http://mr-stream.mediaconnect.hu/4745/mr5.aac"
+    },
+    {
+        "name": "[HUN] Dankó Rádió",
+        "logo": "logos/danko.png",
+        "url": "https://mr-stream.connectmedia.hu/4748/mr7.mp3"
+    },
+    {
+        "name": "[HUN] Jazz Rádió",
+        "logo": "logos/jazz.png",
+        "url": "http://mr-stream.connectmedia.hu/4691/mr9.mp3"
+    },
+    {
+        "name": "[HUN] Nemzeti Sport Rádió",
+        "logo": "logos/Nemzeti_Sport_Radio.png",
+        "url": "http://icast.connectmedia.hu/4656/mr11.aac"
+    },
+    {
+        "name": "[HUN] Buddha FM",
+        "logo": "logos/Buddha_FM.png",
+        "url": "http://libretime.buddhafm.hu:4000/buddhafm"
+    },
+    {
+        "name": "[HUN] Magyar Evangéliumi Rádió Alapitvány",
+        "logo": "logos/Magyar_Evangeliumi_Radio.png",
+        "url": "http://stream.radio.co/s3fd8d173f/listen"
+    },
+    {
+        "name": "[HUN] Mirjam Rádió",
+        "logo": "logos/Maria.png",
+        "url": "http://193.87.81.131:8081/MariaRadioFelvidek"
+    },
+    {
+        "name": "[HUN] Mária Rádió élő adás",
+        "logo": "logos/Maria.png",
+        "url": "http://www.mariaradio.hu:8000/mr"
+    },
+    {
+        "name": "[HUN] RADIO MARIA SERBIA - HUNGARIAN",
+        "logo": "logos/Maria.png",
+        "url": "http://dreamsiteradiocp.com:8014/stream"
+    },
+    {
+        "name": "[HUN] Eletronica Radio Dance Club",
+        "logo": "logos/radio.jpg",
+        "url": "http://maxxima.mine.nu/mr1.mp3"
+    },
+    {
+        "name": "[HUN] EuropaRádió Miskolc",
+        "logo": "logos/Europa_Radio.png",
+        "url": "http://europaradio.hu/miskolc"
+    },
+    {
+        "name": "[HUN] Dominó Rádió",
+        "logo": "logos/domino.png",
+        "url": "http://s03.diazol.hu:7130/stream"
+    },
+    {
+        "name": "[HUN] Radiocafe98",
+        "logo": "logos/Radiocafe.png",
+        "url": "http://193.201.191.68:8080/radiocafe98_192k"
+    },
+    {
+        "name": "[HUN] Zemplén FM",
+        "logo": "logos/Zemplen_FM.png",
+        "url": "https://oxygenmusic.hu:8443/zemplen"
+    },
+    {
+        "name": "[HUN] Christmasfm 10.01.-01.31.[🎄Christmas🎄]",
+        "logo": "logos/christmasfm.png",
+        "url": "https://stream1.christmasfm.hu/live.mp3"
+    },
+    {
+        "name": "[HUN] RADIO SUNRISE - Ragyogj a zenével",
+        "logo": "logos/radiosunrise.png",
+        "url": "http://s03.diazol.hu:7170/stream"
+    },
+    {
+        "name": "[HUN] Best Dance Radio",
+        "logo": "logos/bestdanceradio.png",
+        "url": "https://sonic1-rbx.cloud-center.ro/8018/stream"
+    },
+    {
+        "name": "[HUN] Alpimur Radio",
+        "logo": "logos/Alpimur_Radio.png",
+        "url": "https://ssl.asculta.live/8444/stream"
+    },
+    {
+        "name": "[HUN] Sola Rádió",
+        "logo": "logos/sola.png",
+        "url": "http://188.165.11.30:7000/live.mp3"
+    },
+    {
+        "name": "[HUN] Rádió69 - VirtualDJ Broadcast",
+        "logo": "logos/radio69.png",
+        "url": "http://s03.diazol.hu:7160/stream"
+    },
+    {
+        "name": "[HUN] MiRádiónk",
+        "logo": "logos/miradionk.png",
+        "url": "http://s03.diazol.hu:7080/live.mp3"
+    },
+    {
+        "name": "[HUN] Presidentradio",
+        "logo": "logos/president.jpg",
+        "url": "https://s02.diazol.hu:8072/stream"
+    },
+    {
+        "name": "[HUN] Presidentradio - Pantheus DJ",
+        "logo": "logos/president.jpg",
+        "url": "https://s02.diazol.hu:8072/autodj"
+    },
+    {
+        "name": "[HUN] Dj Pixi Live - Dj Pixi - live",
+        "logo": "logos/icon.png",
+        "url": "http://s01.diazol.hu:9000/stream"
+    },
+    {
+        "name": "[HUN] Intim Részek Rádióműsor",
+        "logo": "logos/irr.jpg",
+        "url": "http://kft.kesintisizyayin.com:8130/stream"
+    },
+    {
+        "name": "[HUN] Vindornya FM - ..::: Vindornya FM :::.. ..::: Hangolj ránk! :::..\\nA legjobb zenékkel változatosan minden nap!\\nVételkörzet: Vindornyaszőlős\\nPop/Rock/Dance/Trance/Club/Electro/House\\n\\nZene a MaXXimumon!",
+        "logo": "logos/vindornya.png",
+        "url": "https://stream.vindornyafm.app:8000/high"
+    },
+    {
+        "name": "[HUN] Slagerexpressz",
+        "logo": "logos/icon.png",
+        "url": "https://slagerexpressz.eu/listen/slagerexpressz/radio.mp3"
+    },
+    {
+        "name": "[HUN] Balatonfüred Rádió",
+        "logo": "logos/balatonfured.png",
+        "url": "http://stream.balatonfuredradio.hu:8040/stream"
+    },
+    {
+        "name": "[HUN] Alfa Rádió",
+        "logo": "logos/alfa.png",
+        "url": "https://net.alfaradio.hu:443"
+    },
+    {
+        "name": "[HUN] Radio Amnesia - Annyi jó zene van...",
+        "logo": "logos/amnesia.png",
+        "url": "http://192.99.13.88:8048/stream"
+    },
+    {
+        "name": "[HUN] FeZen Radio",
+        "logo": "logos/fezen.png",
+        "url": "https://radioe.net:8443/fezen_bk"
+    },
+    {
+        "name": "[HUN] Cross - Hang a zajban",
+        "logo": "logos/cross.png",
+        "url": "http://webradio.ev2.hu:10006/cross.mp3"
+    },
+    {
+        "name": "[HUN] JazzRadio - The Best Hungarian Jazz Station",
+        "logo": "logos/jazzradio.png",
+        "url": "https://www.jazzradio.hu:8000/jazzradio_192.ogg"
+    },
+    {
+        "name": "[HUN] Tarján Rádió",
+        "logo": "logos/tarjan.png",
+        "url": "https://stream.tarjanradio.hu:8000/live"
+    },
+    {
+        "name": "[HUN] EViON Rádió",
+        "logo": "logos/evion.jpg",
+        "url": "http://evion-radio.hu:2086/live.mp3"
+    },
+    {
+        "name": "[HUN] Rádió5 - Ez a zene",
+        "logo": "logos/radio5.png",
+        "url": "http://s01.diazol.hu:9140/stream"
+    },
+    {
+        "name": "[HUN] Magyar Vándor Rádió",
+        "logo": "logos/magyarvandor.jpg",
+        "url": "http://c16.radioboss.fm:8461/stream"
+    },
+    {
+        "name": "[HUN] YO! Radio - Minden ami jó az YO! - Classic Eurodance 24/7 – The Best 90s & 2000s Hits!",
+        "logo": "logos/yo!radio.png",
+        "url": "https://stream.yoradio.xyz/listen/yo_radio/radio.mp3"
+    },
+    {
+        "name": "[HUN] Romania Profi Rádió",
+        "logo": "logos/RomaniaProfi.jpg",
+        "url": "http://93.115.174.139:8000/stream"
+    },
+    {
+        "name": "[HUN] Serbia RTV - Radio Novi Sad 2 (Újvidéki Rádió)",
+        "logo": "logos/ur2.jpg",
+        "url": "http://212.200.230.50:1935/rns2/drugiprogram/livestream/stream.m3u8"
+    },
+    {
+        "name": "[HUN] EBS Radio - Magyar Zene",
+        "logo": "logos/ebs.jpg",
+        "url": "http://azura.ebsmedia.ro:8160/hungarian320.aac"
+    },
+    {
+        "name": "[HUN] Chaos FM",
+        "logo": "logos/chaosfm.png",
+        "url": "http://chaosfm.hu:8000/chaosfm"
+    },
+    {
+        "name": "[HUN] Taska Radio",
+        "logo": "logos/taska.png",
+        "url": "http://live.taskaradio.com:7070/"
+    },
+    {
+        "name": "[HUN] A Sziget Rádió",
+        "logo": "logos/assziget.png",
+        "url": "http://s01.diazol.hu:9010/live"
+    },
+    {
+        "name": "[HUN] Zene Attila Radio7 Kanizsaval",
+        "logo": "logos/zar7k.jpg",
+        "url": "http://s02.diazol.hu:10180/autodj"
+    },
+    {
+        "name": "[HUN] Kossuth Tér Rádió",
+        "logo": "logos/icon.png",
+        "url": "http://stream.kossuthterradio.com:8056/32k.mp3"
+    },
+    {
+        "name": "[HUN] RockBox Radio [☠ROCK☠]",
+        "logo": "logos/rockbox.jpg",
+        "url": "http://vps.vyata.hu:9000/stream"
+    },
+    {
+        "name": "[HUN] Radio Clasic Romania",
+        "logo": "logos/icon.png",
+        "url": "http://www.clasicradio.ro:8000/"
+    },
+    {
+        "name": "[HUN] Romania Rádió GaGa 100% Magyar",
+        "logo": "logos/gaga.png",
+        "url": "https://a2.asurahosting.com:6880/radio.mp3?1741346830"
+    },
+    {
+        "name": "[HUN] Romania Rádió GaGa Gold",
+        "logo": "logos/gaga.png",
+        "url": "https://a2.asurahosting.com:7020/radio.mp3?1741449673"
+    },
+    {
+        "name": "[HUN] Romania Rádió GaGa Marosszék",
+        "logo": "logos/gaga.png",
+        "url": "https://a3.my-control-panel.com:6660/radio.mp3?1709995925"
+    },
+    {
+        "name": "[HUN] Romania Rádió GaGa Háromszék",
+        "logo": "logos/gaga.png",
+        "url": "https://a3.my-control-panel.com:6670/radio.mp3"
+    },
+    {
+        "name": "[HUN] Romania Rádió GaGa Udvarhelyszék",
+        "logo": "logos/gaga.png",
+        "url": "https://a3.my-control-panel.com:6680/radio.mp3?1709996423"
+    },
+    {
+        "name": "[HUN] Romania Rádió GaGa Csíkszék",
+        "logo": "logos/gaga.png",
+        "url": "https://a3.my-control-panel.com:6700/radio.mp3"
+    },
+    {
+        "name": "[HUN] Fitradio Rock online [☠ROCK☠]",
+        "logo": "logos/fitradio.png",
+        "url": "https://azuracast.fitradio.hu:8000/fitradio.mp3"
+    },
+    {
+        "name": "[HUN] Fitradio techno online",
+        "logo": "logos/fitradio.png",
+        "url": "https://azuracast.fitradio.hu:8010/fitradioDJ.mp3"
+    },
+    {
+        "name": "[HUN] Fitradio Deep house online",
+        "logo": "logos/fitradio.png",
+        "url": "https://azuracast.fitradio.hu:8030/fitradiodeephouse.mp3"
+    },
+    {
+        "name": "[HUN] Fitrádió R'n'B online",
+        "logo": "logos/fitradio.png",
+        "url": "https://azuracast.fitradio.hu:8036/fitradiornb.mp3"
+    },
+    {
+        "name": "[HUN] Webradio Balaton",
+        "logo": "logos/icon.png",
+        "url": "https://balaton.stream.laut.fm/balaton?t302=2023-04-25_20-05-19&uuid=3f273cdf-fef5-4c1c-b184-0e39fb896bd8"
+    },
+    {
+        "name": "[HUN] Szabo stream",
+        "logo": "logos/icon.png",
+        "url": "https://cast4.asurahosting.com/proxy/zoltan/stream/"
+    },
+    {
+        "name": "[HUN] Papageno Radio",
+        "logo": "logos/papageno.png",
+        "url": "https://onair7.xdevel.com/proxy/xautocloud_o3yj_837?mp=/;stream/;"
+    },
+    {
+        "name": "[HUN] AnikoFmClub radio",
+        "logo": "logos/icon.png",
+        "url": "https://radio.bekescomputer.hu/anikoradioja"
+    },
+    {
+        "name": "[HUN] Vatican News Radio Magyar",
+        "logo": "logos/vaticannews.png",
+        "url": "https://radio.vaticannews.va/stream-hu"
+    },
+    {
+        "name": "[HUN] Bajai Rádió - 89.8 FM",
+        "logo": "logos/bajairadio.png",
+        "url": "https://s03.diazol.hu:7002/live.mp3"
+    },
+    {
+        "name": "[HUN] Party Dj Rádió",
+        "logo": "logos/pdr.png",
+        "url": "https://s03.diazol.hu:7062/stream"
+    },
+    {
+        "name": "[HUN] FRED FILM RADIO Hungarian",
+        "logo": "logos/fredfilm.png",
+        "url": "https://s10.webradio-hosting.com/proxy/fredradiohu/stream/"
+    },
+    {
+        "name": "[HUN] B.á.r. Rádió",
+        "logo": "logos/barradio.png",
+        "url": "https://solid24.streamupsolutions.com/proxy/nilxzqeg?mp=/type=mp3"
+    },
+    {
+        "name": "[HUN] Rádió M - Miskolc- 101.6 FM",
+        "logo": "logos/radiom.png",
+        "url": "https://stream.42netmedia.com:8443/radiom"
+    },
+    {
+        "name": "[HUN] Sepsi Rádió Romania",
+        "logo": "logos/sepsi.png",
+        "url": "https://stream.sepsiradio.ro:8001/SepsiRadio"
+    },
+    {
+        "name": "[HUN] Euro Music Rádió",
+        "logo": "logos/euromusicradio.jpg",
+        "url": "http://a1.asurahosting.com:9480/radio.m3u"
+    },
+    {
+        "name": "a nap 24 órájában !",
+        "logo": "logos/icon.png",
+        "url": "http://freestream.hu:8040/nosztalgiacaffe"
+    },
+    {
+        "name": "[HUN] Friss FM Kisvarda",
+        "logo": "logos/frissfm.png",
+        "url": "http://stream.frissfm.hu:10050/"
+    },
+    {
+        "name": "[HUN] Lépés - Sláger Rádió - Egy Lépéssel Közelebb a Múlt slágereihez!",
+        "logo": "logos/icon.png",
+        "url": "http://stream.nmih.hu:4000/slager.mp3"
+    },
+    {
+        "name": "[HUN] Deluxe FM",
+        "logo": "logos/deluxefm.png",
+        "url": "http://musorcsere.hu:8390/deluxefm"
+    },
+    {
+        "name": "[HUN] SoDI WEBRÁDIÓJA",
+        "logo": "logos/icon.png",
+        "url": "https://stream.sodikereso.info/radio/8040/radio.mp3"
+    },
+    {
+        "name": "[HUN] Gyergyói Székely Rádió",
+        "logo": "logos/szekely.png",
+        "url": "http://szekelyradio.top:8000/szekely"
+    },
+    {
+        "name": "[HUN] RTFM Lounge",
+        "logo": "logos/icon.png",
+        "url": "http://listen.radionomy.com/allstarretroradio60s--90s-zene24-7"
+    },
+    {
+        "name": "[HUN] RadioHy",
+        "logo": "d:\\media\\audio\\0000 playlist\\logos\\radiohy.png",
+        "url": "https://a8.asurahosting.com:9250/radio.mp3"
+    },
+    {
+        "name": "[HUN] Battyus FM [Zeno!] [📻Mulatós📻]",
+        "logo": "logos/battyus_fm.jpg",
+        "url": "https://stream.zenolive.com:443/u6v02bbc9f0uv"
+    },
+    {
+        "name": "[HUN] DaruMulatós [Zeno!] [📻Mulatós📻]",
+        "logo": "logos/daru.png",
+        "url": "http://stream.zeno.fm/27ykc7zbps8uv"
+    },
+    {
+        "name": "[HUN] DaruRádió [Zeno!] [📻Mulatós📻]",
+        "logo": "logos/daru.png",
+        "url": "http://stream.zeno.fm/y6rdg38b6f8uv"
+    },
+    {
+        "name": "[HUN] Mulattató Rádió [Zeno!] [📻Mulatós📻]",
+        "logo": "logos/radio.jpg",
+        "url": "http://stream-54.zeno.fm/eiezunovvfcvv?zs=nFY2JvhoQi-cCpOsoUeS7g"
+    },
+    {
+        "name": "[HUN] Cigány zene [Zeno!] [📻Mulatós📻]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/49mu7n23n48uv"
+    },
+    {
+        "name": "[HUN] Exodus FM Autentikus Cigány zene [Zeno!] [📻Mulatós📻]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/59e0zzg28zhvv"
+    },
+    {
+        "name": "[HUN] Cigány Rádió [Zeno!] [📻Mulatós📻]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/arel8xmxxhdtv"
+    },
+    {
+        "name": "[HUN] Ciganyzene2021 [Zeno!] [📻Mulatós📻]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/qu2anwhzem8uv"
+    },
+    {
+        "name": "[HUN] FlamingoMulatosRadio [Zeno!] [📻Mulatós📻]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/0e8e0kbwnc9uv"
+    },
+    {
+        "name": "[HUN] Gaby71 Mulatós Rádió [Zeno!] [📻Mulatós📻]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/6v16n7a1w0hvv"
+    },
+    {
+        "name": "[HUN] mulatós fm [Zeno!] [📻Mulatós📻]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/bpefba04wuhvv"
+    },
+    {
+        "name": "[HUN] Mulatos Radio Online [Zeno!] [📻Mulatós📻]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/kqmm6f8n54zuv"
+    },
+    {
+        "name": "[HUN] mulatos radio [Zeno!] [📻Mulatós📻]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/tepgyb2zmv8uv"
+    },
+    {
+        "name": "[HUN] Radio1 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/s7ce3sqrg7guv"
+    },
+    {
+        "name": "[HUN] Balmaz Rock Rádió [Zeno!][☠ROCK☠]",
+        "logo": "logos/radio.jpg",
+        "url": "http://stream.zeno.fm/qw52awsrta0uv"
+    },
+    {
+        "name": "[HUN] Balmaz Retró Rádió [Zeno!]",
+        "logo": "logos/balmaz_retro.jpg",
+        "url": "http://stream.zeno.fm/u4ra0d90fm0uv"
+    },
+    {
+        "name": "[HUN] Best Of Music Fm Hungary [Zeno!]",
+        "logo": "logos/best_of_music_fm.jpg",
+        "url": "http://stream-52.zeno.fm/tqluccjphi8vv"
+    },
+    {
+        "name": "[HUN] Gold Fm Rádió [Zeno!]",
+        "logo": "logos/Gold_FM.png",
+        "url": "http://stream.zeno.fm/8qpcc5np2uhvv"
+    },
+    {
+        "name": "[HUN] Hangos Rádió [Zeno!]",
+        "logo": "logos/Hangos_Radio.png",
+        "url": "http://stream.zeno.fm/mv62tmd8wp8uv"
+    },
+    {
+        "name": "[HUN] HBC News Station [Zeno!]",
+        "logo": "logos/hbc.jpg",
+        "url": "http://node-35.zeno.fm:80/m94d336hh5zuv"
+    },
+    {
+        "name": "[HUN] Kalóz Rádió [Zeno!]",
+        "logo": "logos/kaloz_radio.jpg",
+        "url": "http://stream.zeno.fm/s9gg29m2g18uv"
+    },
+    {
+        "name": "[HUN] MegaMixx [Zeno!]",
+        "logo": "logos/daru.png",
+        "url": "http://stream.zeno.fm/kemkabxzbfhvv"
+    },
+    {
+        "name": "[HUN] Menő FM [Zeno!]",
+        "logo": "logos/Meno_FM.png",
+        "url": "http://stream.zeno.fm/skm3k46p7yzuv"
+    },
+    {
+        "name": "[HUN] NeonFM [Zeno!]",
+        "logo": "logos/NeonFM.png",
+        "url": "http://stream-47.zeno.fm/q52f6x75038uv?zs=43dZeBnWT-CUQcylFT34DA"
+    },
+    {
+        "name": "[HUN] Nonstop Rádió [Zeno!]",
+        "logo": "logos/Nonstop_Radio.png",
+        "url": "http://stream.zeno.fm/mmuk4cz57wnvv"
+    },
+    {
+        "name": "[HUN] Nonstop Rádió [Zeno!]",
+        "logo": "logos/Nonstop_Radio.png",
+        "url": "http://stream.zenolive.com:80/3kvvgvuetuhvv"
+    },
+    {
+        "name": "[HUN] Oldies Music Rádió [Zeno!]",
+        "logo": "logos/Oldies_Music_Radio.jpg",
+        "url": "http://stream.zeno.fm/elednpogwt5vv"
+    },
+    {
+        "name": "[HUN] SummerfallFM [Zeno!]",
+        "logo": "logos/SummerfallFM.png",
+        "url": "http://stream.zeno.fm/7tgkw557af9uv"
+    },
+    {
+        "name": "[HUN] TC RaDIo [Zeno!]",
+        "logo": "logos/TC_RaDIo.png",
+        "url": "https://stream.zeno.fm:443/ewsds4nq01zuv"
+    },
+    {
+        "name": "[HUN] ZAJ Rádió [Zeno!]",
+        "logo": "logos/ZAJ_Radio.png",
+        "url": "http://stream.zeno.fm/sffhlhxewtrvv"
+    },
+    {
+        "name": "[HUN] Chiqui Radio [Zeno!]",
+        "logo": "logos/radio.jpg",
+        "url": "https://stream.zeno.fm/gvz27wezgghtv"
+    },
+    {
+        "name": "[HUN] Fiatalok Online Rádiója [Zeno!]",
+        "logo": "logos/radio.jpg",
+        "url": "http://stream-57.zeno.fm/nchhkd3ti6avv?zs=_qIIPGgNQgihszHTjV_D-A"
+    },
+    {
+        "name": "[HUN] Magyarok Világszerte Rádió [Zeno!]",
+        "logo": "logos/radio.jpg",
+        "url": "http://stream.zeno.fm/6mjh0wvxrsfuv"
+    },
+    {
+        "name": "[HUN] PressPress [Zeno!]",
+        "logo": "logos/radio.jpg",
+        "url": "http://stream.zeno.fm/pacpunz0338uv"
+    },
+    {
+        "name": "[HUN] Rife 2022 [Zeno!]",
+        "logo": "logos/radio.jpg",
+        "url": "http://stream.zeno.fm/byh9ytzhpchvv"
+    },
+    {
+        "name": "[HUN] Party Zona 2023 [Zeno!]",
+        "logo": "logos/Party_Zona_2023.png",
+        "url": "http://stream.zeno.fm/82m9u6faaf9uv"
+    },
+    {
+        "name": "[HUN] Rádió 8000",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/sb0fkxf4hvhvv"
+    },
+    {
+        "name": "[HUN] BORSEC ROMANEASCA BEST [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/4yrpxhgt34zuv"
+    },
+    {
+        "name": "[HUN] BORSEC MAGYAR BEST [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/8bbx12env4zuv"
+    },
+    {
+        "name": "[HUN] BORSEC FUNKY [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/74qt1xwgup8uv"
+    },
+    {
+        "name": "[HUN] BORSEC MEGAMIXES [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/091eam8pv4zuv"
+    },
+    {
+        "name": "[HUN] BORSEC 90s [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/7044uqmmv4zuv"
+    },
+    {
+        "name": "[HUN] BORSEC MULATOS [Zeno!] [📻Mulatós📻]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/b9sms67nmrhvv"
+    },
+    {
+        "name": "[HUN] BORSEC RELAX [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/bhjkgfl1htotv"
+    },
+    {
+        "name": "[HUN] BORSEC CLASIC [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ctcyp7mbh5nvv"
+    },
+    {
+        "name": "[HUN] BORSEC-NEW [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/fwwhdn1hxy8uv"
+    },
+    {
+        "name": "[HUN] BORSEC REGGAE [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/h27zmxdcvuhvv"
+    },
+    {
+        "name": "[HUN] BORSEC DEEP [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/jmnv7hhoylhtv"
+    },
+    {
+        "name": "[HUN] BORSEC ROCK [Zeno!][☠ROCK☠]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/muq7qnrvwk8uv"
+    },
+    {
+        "name": "[HUN] BORSEC 80s [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/rka4usqnv4zuv"
+    },
+    {
+        "name": "[HUN] BORSEC PETRECERE [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/tmkua5cf6kytv"
+    },
+    {
+        "name": "[HUN] BORSEC NRG [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/trx597zkdjmvv"
+    },
+    {
+        "name": "[HUN] BORSEC ITALO DISCO [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/wb5unsh91d0uv"
+    },
+    {
+        "name": "[HUN] #MToth. The Radio of the Noir-Opinion. [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ay8vfs9rp7zuv"
+    },
+    {
+        "name": "[HUN] 001hooloo [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/7k53db5w338uv"
+    },
+    {
+        "name": "[HUN] 252 Entertaiment [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/t1cvpyh7srhvv"
+    },
+    {
+        "name": "[HUN] 2023zenem [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/5dkjfwtfzjouv"
+    },
+    {
+        "name": "[HUN] _X_x_X_jack988_X_x_X [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/pcgsagq9by8uv"
+    },
+    {
+        "name": "[HUN] A sport is tuti [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/chxk9hupsuhvv"
+    },
+    {
+        "name": "[HUN] A Szabad Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/mh89to921yjvv"
+    },
+    {
+        "name": "[HUN] Ady Sulirádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/zucqfxq3xbuuv"
+    },
+    {
+        "name": "[HUN] Ampix Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/0uifuoaw2g5uv"
+    },
+    {
+        "name": "[HUN] Ana Spotify [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/fis69ukscnjvv"
+    },
+    {
+        "name": "[HUN] Anarky Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/js8v2v7leawuv"
+    },
+    {
+        "name": "[HUN] Andrássy rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/rgq7ebrbt5bvv"
+    },
+    {
+        "name": "[HUN] Anger management [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/xxfhtz5txhhvv"
+    },
+    {
+        "name": "[HUN] Apaya Youtube Csatorna [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/z0uwm5kmky8uv"
+    },
+    {
+        "name": "[HUN] Arc FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/24utcxhrq0hvv"
+    },
+    {
+        "name": "[HUN] AriaPink [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/mvuvx3u6kfhvv"
+    },
+    {
+        "name": "[HUN] asdsad [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/1dmhgarcaxhvv"
+    },
+    {
+        "name": "[HUN] Assadd [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/7p14ckwkh48uv"
+    },
+    {
+        "name": "[HUN] astralmtaotl [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/bfhnvtqmsizvv"
+    },
+    {
+        "name": "[HUN] astralmtatyreek [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/dc1yampv4lnvv"
+    },
+    {
+        "name": "[HUN] ATE Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/wxgkpcczi2guv"
+    },
+    {
+        "name": "[HUN] Ateeeee [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/9xx62h57568uv"
+    },
+    {
+        "name": "[HUN] AuraChill [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/qr8a4t3c6zhvv"
+    },
+    {
+        "name": "[HUN] AwareFM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/f0va46nsrp8uv"
+    },
+    {
+        "name": "[HUN] azta radio 21 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/x5swoxpefmauv"
+    },
+    {
+        "name": "[HUN] babifm [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ru6yw1n7dxgtv"
+    },
+    {
+        "name": "[HUN] BabyBrainBeats (Month 1 Playlist) [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/obcmf1f2ez7vv"
+    },
+    {
+        "name": "[HUN] BabyBrainBeats (Month 2 Playlist) [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/zjb2szlzo0guv"
+    },
+    {
+        "name": "[HUN] BabyBrainBeats (Month 4 Playlist) [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/wapslms80bmuv"
+    },
+    {
+        "name": "[HUN] BabyBrainBeats (Month 7 Playlist) [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ogojs1wwvhduv"
+    },
+    {
+        "name": "[HUN] BabyBrainBeats (Month 13 Playlist) [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/sbljjajicmtvv"
+    },
+    {
+        "name": "[HUN] BabyBrainBeats (Month 16 Playlist) [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/sbr2rr5qba0vv"
+    },
+    {
+        "name": "[HUN] BabyBrainBeats (Month 18 Playlist) [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/k59m63qg6hpuv"
+    },
+    {
+        "name": "[HUN] BabyBrainBeats (Month 24 Playlist) [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/6vyj2t6zw6uvv"
+    },
+    {
+        "name": "[HUN] BabyBrainBeats (Prenatal Month 5 Playlist) [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/58g7htqj6govv"
+    },
+    {
+        "name": "[HUN] BabyBrainBeats (Prenatal Month 6 Playlist) [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/zr6m5rqcjvkvv"
+    },
+    {
+        "name": "[HUN] BabyBrainBeats (Prenatal Month 7 Playlist) [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/kps3bisy3oiuv"
+    },
+    {
+        "name": "[HUN] BabyBrainBeats (Prenatal Month 8 Playlist) [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/vaclarvgwvmuv"
+    },
+    {
+        "name": "[HUN] BADTRIP RADIO [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/qfmg5u9w4rhvv"
+    },
+    {
+        "name": "[HUN] balkan radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/2ibfhixwuytvv"
+    },
+    {
+        "name": "[HUN] Balog Patrik Plus Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/rpe49q17vuhvv"
+    },
+    {
+        "name": "[HUN] BaloghFM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/vxpnytekmxhvv"
+    },
+    {
+        "name": "[HUN] Bean Machine Station [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/g9wcnqckf7ftv"
+    },
+    {
+        "name": "[HUN] BellusZeneRadio2022 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/1v08atkrxrhvv"
+    },
+    {
+        "name": "[HUN] Bence fm [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/y4e5feoblgsuv"
+    },
+    {
+        "name": "[HUN] Bernie DJ Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/s9w6pzrynuhvv"
+    },
+    {
+        "name": "[HUN] Bernie Story [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/nt3681rkfuhvv"
+    },
+    {
+        "name": "[HUN] BEST OF Rádió 1 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/5ubi9oyhduovv"
+    },
+    {
+        "name": "[HUN] BestHunRadio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/z43bdw00grhvv"
+    },
+    {
+        "name": "[HUN] Bitto Duo playlist [Zeno!] [📻Mulatós📻]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/wto9rmahp9hvv"
+    },
+    {
+        "name": "[HUN] Blues Classics [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/m54q7zyb5v8uv"
+    },
+    {
+        "name": "[HUN] Bradio-fm [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/huwhtpbfny8uv"
+    },
+    {
+        "name": "[HUN] Bugacradio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/rxapjfxgmzptv"
+    },
+    {
+        "name": "[HUN] BuliRadio1 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/bfq5ukhxyqztv"
+    },
+    {
+        "name": "[HUN] Bundi FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/bf80azcexf9uv"
+    },
+    {
+        "name": "[HUN] C0bra3055 radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/wb7ty2wf798uv"
+    },
+    {
+        "name": "[HUN] Cafe Balaton Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/jrw10my971ytv"
+    },
+    {
+        "name": "[HUN] CarlitosFM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/nq2cuy9pmiyvv"
+    },
+    {
+        "name": "[HUN] Cherry1 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/9rpzt2aukchvv"
+    },
+    {
+        "name": "[HUN] chihuahua [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/u6fmhwn43rzvv"
+    },
+    {
+        "name": "[HUN] ChillZONE [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/u35tu42q4ehvv"
+    },
+    {
+        "name": "[HUN] chloeanika [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ldzknhff25otv"
+    },
+    {
+        "name": "[HUN] Class FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/n957ch401a0uv"
+    },
+    {
+        "name": "[HUN] Classic FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/jym24aku8fuuv"
+    },
+    {
+        "name": "[HUN] ClassicMTA.fm [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/1lqepumfxwwtv"
+    },
+    {
+        "name": "[HUN] Classics of all genre [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/a78h6z5taq8uv"
+    },
+    {
+        "name": "[HUN] Club Rádio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/8vxzd6ccj7auv"
+    },
+    {
+        "name": "[HUN] Club Vinewood [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/izhoixdg95htv"
+    },
+    {
+        "name": "[HUN] Coronita [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/a97s0ks8nf9uv"
+    },
+    {
+        "name": "[HUN] Coronita kattogós ezt hallgasd most a feketéknek speciálba [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/qkxl3sz3dwpuv"
+    },
+    {
+        "name": "[HUN] cP Uptempo [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ci2xpivcjtsuv"
+    },
+    {
+        "name": "[HUN] cressy [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ajf84ad9dexvv"
+    },
+    {
+        "name": "[HUN] csillagokradioja [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/a5bttt47g0hvv"
+    },
+    {
+        "name": "[HUN] Csodás világ [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ni9rzbqtj6cuv"
+    },
+    {
+        "name": "[HUN] Csongi radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/1j0caiskfqvtv"
+    },
+    {
+        "name": "[HUN] Csónakház Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/937yc85f27zuv"
+    },
+    {
+        "name": "[HUN] Dance X Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/f8iqobel9xxtv"
+    },
+    {
+        "name": "[HUN] Dantee Vibe Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/qa3b6u2fk48uv"
+    },
+    {
+        "name": "[HUN] Dark City FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/yda3fssgfvauv"
+    },
+    {
+        "name": "[HUN] DARKSIDE ROLEPLAY [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/aid9ioielmwuv"
+    },
+    {
+        "name": "[HUN] Davidbro [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/wio5ieegcq7uv"
+    },
+    {
+        "name": "[HUN] DawnMTA BMS [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/hru6d0jh1tgtv"
+    },
+    {
+        "name": "[HUN] DaydaY [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/htvg660reg0uv"
+    },
+    {
+        "name": "[HUN] Delvin Classic Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/53hp9t192k0uv"
+    },
+    {
+        "name": "[HUN] devilhell [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/yznicte9vbxuv"
+    },
+    {
+        "name": "[HUN] Dio FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/gscd8a6iubcvv"
+    },
+    {
+        "name": "[HUN] Disco Expressz [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/nd4d1p61i0euv"
+    },
+    {
+        "name": "[HUN] Dj Danny radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/r07uz30exf9uv"
+    },
+    {
+        "name": "[HUN] Dj Fm Music [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/8zu2wsfypvxuv"
+    },
+    {
+        "name": "[HUN] DJ Kicsi [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/lyztenb0jjnvv"
+    },
+    {
+        "name": "[HUN] Dj Zenevonat [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/932k5s0b6zhvv"
+    },
+    {
+        "name": "[HUN] DjGomez [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ztigujaelsvvv"
+    },
+    {
+        "name": "[HUN] DjPogiesbarataiFM2024 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/dju5cxwdzwiuv"
+    },
+    {
+        "name": "[HUN] DNB Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/7thkmbtvvxhvv"
+    },
+    {
+        "name": "[HUN] DoktorWhite [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/krduk7qaaf9uv"
+    },
+    {
+        "name": "[HUN] Dream Life Club [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/mmybvothq2qvv"
+    },
+    {
+        "name": "[HUN] DRK Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/eaw1ffhm268uv"
+    },
+    {
+        "name": "[HUN] Drox FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/dscsu080yojvv"
+    },
+    {
+        "name": "[HUN] Duni FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/rzv0bxxkyvdvv"
+    },
+    {
+        "name": "[HUN] Dushane [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/uj809kdj2zltv"
+    },
+    {
+        "name": "[HUN] easYYY Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/wda5nrt7568uv"
+    },
+    {
+        "name": "[HUN] EDMBangerRadio Hungary [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/aq5n1grdf18uv"
+    },
+    {
+        "name": "[HUN] Egyseg Radio Media [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/6cl730xsoehuv"
+    },
+    {
+        "name": "[HUN] Element FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/k3uw60e124zuv"
+    },
+    {
+        "name": "[HUN] EncyZene Radio 2024 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/hykg1pjxqqpuv"
+    },
+    {
+        "name": "[HUN] Eron FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/u9kyi9j8dhluv"
+    },
+    {
+        "name": "[HUN] Estre rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ctu3t0ebz98uv"
+    },
+    {
+        "name": "[HUN] Eurodance 90 Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/4ljjj2mjk4ntv"
+    },
+    {
+        "name": "[HUN] Falusi Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/z0ak114urnhvv"
+    },
+    {
+        "name": "[HUN] FantasyParty [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/kk84ah5u438uv"
+    },
+    {
+        "name": "[HUN] Fantasyy11 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/xwbn3qzvz08uv"
+    },
+    {
+        "name": "[HUN] FineCityFM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/rqfxufvm2hfvv"
+    },
+    {
+        "name": "[HUN] Fiszifaszi [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/wxpkf0enwqivv"
+    },
+    {
+        "name": "[HUN] Five FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/9uk6lacfsvetv"
+    },
+    {
+        "name": "[HUN] Flash FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/339bme0zdf9uv"
+    },
+    {
+        "name": "[HUN] FlowMTA [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/b5bbz048v1tuv"
+    },
+    {
+        "name": "[HUN] Folk Classics [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ambkqa4ezs8uv"
+    },
+    {
+        "name": "[HUN] Forróvonal FM Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/m22tsf1oehtuv"
+    },
+    {
+        "name": "[HUN] FortingRadio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/0d82ku0v7hhvv"
+    },
+    {
+        "name": "[HUN] FortunaMusicRadio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/7ewwa4vem98uv"
+    },
+    {
+        "name": "[HUN] Four Dragons Radio Station [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/bah9ohglpbguv"
+    },
+    {
+        "name": "[HUN] Funk FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/vmjy57nlytuvv"
+    },
+    {
+        "name": "[HUN] FunMTA Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/dufelknvsxbuv"
+    },
+    {
+        "name": "[HUN] Gamatka [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/cokmeuydcpfuv"
+    },
+    {
+        "name": "[HUN] ghetto FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/qb8wtwam7s8uv"
+    },
+    {
+        "name": "[HUN] Glass FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/b0ktvszqicrvv"
+    },
+    {
+        "name": "[HUN] GO RADIO [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/u4egprsvsf9uv"
+    },
+    {
+        "name": "[HUN] Gold Party [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/mziyxfzz31ltv"
+    },
+    {
+        "name": "[HUN] GoodMan [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/z8p5z82pkj6uv"
+    },
+    {
+        "name": "[HUN] GUERREANDO PARA JESUCRISTO [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/d8zzdmrzry8uv"
+    },
+    {
+        "name": "[HUN] gyugyumusic [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/jugpxd4td6duv"
+    },
+    {
+        "name": "[HUN] Gábor FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/fdjulk7kcsluv"
+    },
+    {
+        "name": "[HUN] Gárdonyi Református Kvázi Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/p3fsk45zpfhvv"
+    },
+    {
+        "name": "[HUN] habosfm [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ghfkbbmypqvvv"
+    },
+    {
+        "name": "[HUN] HappinessFM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/3aviotzvdwquv"
+    },
+    {
+        "name": "[HUN] harasztiradio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/hgra1dnsmrhvv"
+    },
+    {
+        "name": "[HUN] High FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/zzeho4blzdhvv"
+    },
+    {
+        "name": "[HUN] hontfm [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/pxn3vkmhaxhvv"
+    },
+    {
+        "name": "[HUN] Hood Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/42rr9sexqfhvv"
+    },
+    {
+        "name": "[HUN] Hornbills AutoDJ [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/9n8hsqnvmnjuv"
+    },
+    {
+        "name": "[HUN] Hungarian stuff and phonk [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/iqgtdvjxgtztv"
+    },
+    {
+        "name": "[HUN] Hysteria Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/0emtng4zqnhvv"
+    },
+    {
+        "name": "[HUN] I LOVE 2000 RADIO [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ygxvhgshys8uv"
+    },
+    {
+        "name": "[HUN] Ige Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/6umfba8cwnhvv"
+    },
+    {
+        "name": "[HUN] ihavenoidea [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/dfqkt9d4n48uv"
+    },
+    {
+        "name": "[HUN] Isaacs Music [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/fwmbmtb1m0hvv"
+    },
+    {
+        "name": "[HUN] Isti_nagy [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/tcfsucnwgc7vv"
+    },
+    {
+        "name": "[HUN] IVIester [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/atft00z2mkuvv"
+    },
+    {
+        "name": "[HUN] Izsák Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/2rfx9setvxhvv"
+    },
+    {
+        "name": "[HUN] JAWA FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/lqxupqpkcyeuv"
+    },
+    {
+        "name": "[HUN] Jazz Classics [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/sy7pyuuc0s8uv"
+    },
+    {
+        "name": "[HUN] Karacsony radio [Zeno!] [🎄Christmas🎄]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/7ns5yy214d0uv"
+    },
+    {
+        "name": "[HUN] Keno Som [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/0tmwr6k9n48uv"
+    },
+    {
+        "name": "[HUN] knight life radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/4pt9ykw7py8uv"
+    },
+    {
+        "name": "[HUN] Knock FM - HipHop [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/in3npzuywmmvv"
+    },
+    {
+        "name": "[HUN] Knock FM - Rock [Zeno!][☠ROCK☠]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/nosmr3xwajotv"
+    },
+    {
+        "name": "[HUN] Knock FM - Techno [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/sqqfrgrmsuhvv"
+    },
+    {
+        "name": "[HUN] Koktél Rádió Hungary [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/hggprtmkdsevv"
+    },
+    {
+        "name": "[HUN] Kőhattyú Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/2ud04pp63d0uv"
+    },
+    {
+        "name": "[HUN] Laguna [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/krzowjikamxuv"
+    },
+    {
+        "name": "[HUN] lalusfm [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/wbndtr4zmdyuv"
+    },
+    {
+        "name": "[HUN] Lauraradio3 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/yeqihwonjwrtv"
+    },
+    {
+        "name": "[HUN] Lazuló szoba [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/cw1a25hugisuv"
+    },
+    {
+        "name": "[HUN] Lepegetos FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/7cbrgjxuxtavv"
+    },
+    {
+        "name": "[HUN] Los Santos Police Department [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/t149n242yuhvv"
+    },
+    {
+        "name": "[HUN] LS radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/svbkhyd0nhduv"
+    },
+    {
+        "name": "[HUN] mad-players [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/gm4r3kryz08uv"
+    },
+    {
+        "name": "[HUN] Magyar Hot Pursuit Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/4e10e7qxz08uv"
+    },
+    {
+        "name": "[HUN] Magyar Trash Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/wwu0p8ggpp0uv"
+    },
+    {
+        "name": "[HUN] MagyarAgy1 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ptazkkgy1a0uv"
+    },
+    {
+        "name": "[HUN] Magyarok Világszerte Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/vrv7lzyrb6ivv"
+    },
+    {
+        "name": "[HUN] make fm [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/thawshq4568uv"
+    },
+    {
+        "name": "[HUN] Malibu station [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/j2gpqmomqdxtv"
+    },
+    {
+        "name": "[HUN] Mambas radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/jstvaxtsddruv"
+    },
+    {
+        "name": "[HUN] Mamuthka FM - Gaming [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/zz5vz6l8x2yuv"
+    },
+    {
+        "name": "[HUN] Mamuthka fm [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/3nakkywsz68uv"
+    },
+    {
+        "name": "[HUN] Mamutwave [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/pq518ovwyhevv"
+    },
+    {
+        "name": "[HUN] Marble Square [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/zjpkilgvbanuv"
+    },
+    {
+        "name": "[HUN] Marlboro Veretös [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/gkuwbap3sxhvv"
+    },
+    {
+        "name": "[HUN] Martin [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/p8993euhzrhvv"
+    },
+    {
+        "name": "[HUN] MAX MUSIC RADIO [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/fq9qaysuxc9uv"
+    },
+    {
+        "name": "[HUN] Melodi rádio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/z0gkzgqsr2itv"
+    },
+    {
+        "name": "[HUN] Metal Atak Budais Radio [Zeno!][☠ROCK☠]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/awr0ymwwizdtv"
+    },
+    {
+        "name": "[HUN] Metal Atak Budais Radio Black Side [Zeno!][☠ROCK☠]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ypovdmwooxstv"
+    },
+    {
+        "name": "[HUN] meteor [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/cvo0itg8olsuv"
+    },
+    {
+        "name": "[HUN] Meteor FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ddkhxdxcqycvv"
+    },
+    {
+        "name": "[HUN] Meteor fm a kedvencek [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/nq1tjdubjiuuv"
+    },
+    {
+        "name": "[HUN] Meteor FM Blue [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ldn5nbwyhvbtv"
+    },
+    {
+        "name": "[HUN] Meteor FM Retro [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ep7daoodcxavv"
+    },
+    {
+        "name": "[HUN] Meteor Hazai pálya [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/uetfwzkajo5vv"
+    },
+    {
+        "name": "[HUN] MFFM SHITS [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ffcqpwtv8sgtv"
+    },
+    {
+        "name": "[HUN] Mikó Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/dekgh8ra2d0uv"
+    },
+    {
+        "name": "[HUN] Milanurlecsak [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/elmzq4guuy2uv"
+    },
+    {
+        "name": "[HUN] Mittokiraj [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ijhbgsxhhuluv"
+    },
+    {
+        "name": "[HUN] MLM Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/devf7xc7pzzuv"
+    },
+    {
+        "name": "[HUN] MoizFM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/cw88a3yq2nhvv"
+    },
+    {
+        "name": "[HUN] MOON HOP Reggae Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/f0un4pye7a0uv"
+    },
+    {
+        "name": "[HUN] MTA - Lövész Képző [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/pswme2hku6zuv"
+    },
+    {
+        "name": "[HUN] Music Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/gc7y116bn48uv"
+    },
+    {
+        "name": "[HUN] MusicWorldRadio2014 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/7sph74cymmvvv"
+    },
+    {
+        "name": "[HUN] MűvFeri FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/nomrj9gdbdhvv"
+    },
+    {
+        "name": "[HUN] Neexypoo [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/z0zpmny2w0hvv"
+    },
+    {
+        "name": "[HUN] neirostream [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/3py4bwafwuiuv"
+    },
+    {
+        "name": "[HUN] Neo Web Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/21bk8puezxhvv"
+    },
+    {
+        "name": "[HUN] NeonFM Xmas [Zeno!] [🎄Christmas🎄]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/w5utmyr6fc9uv"
+    },
+    {
+        "name": "[HUN] Neptunusz Rádió - töltsd meg a napod zenével [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/qvx36r6vgleuv"
+    },
+    {
+        "name": "[HUN] New Life Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/rniypgnzdbmuv"
+    },
+    {
+        "name": "[HUN] NextDay Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/te8cdoeymkzuv"
+    },
+    {
+        "name": "[HUN] Nonstop radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/bd0fc56vty8uv"
+    },
+    {
+        "name": "[HUN] Nova RolePlay Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/rrno64vwk43uv"
+    },
+    {
+        "name": "[HUN] Octanseventzene [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/kwg9w7e4hm7uv"
+    },
+    {
+        "name": "[HUN] Oldies Music Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/czmt33yyhdhvv"
+    },
+    {
+        "name": "[HUN] On The Low [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/eyvf2ubs6e9uv"
+    },
+    {
+        "name": "[HUN] Onebuli [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/gnqe13surcstv"
+    },
+    {
+        "name": "[HUN] OnTheLow Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/qqm0m309qxhvv"
+    },
+    {
+        "name": "[HUN] Optikai Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/csvn2sm1ud0uv"
+    },
+    {
+        "name": "[HUN] originalRoleplay FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/cljulpnagdctv"
+    },
+    {
+        "name": "[HUN] Osszes zenem [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/o2vzpwylvd7uv"
+    },
+    {
+        "name": "[HUN] Pacific Bluffs [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/acxwcukgzlftv"
+    },
+    {
+        "name": "[HUN] Paleephonk [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/s84ta6uzw0hvv"
+    },
+    {
+        "name": "[HUN] Pamkutya [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/m8cxz1ua6uhvv"
+    },
+    {
+        "name": "[HUN] Pdtdifm [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/1zukkpeis5ouv"
+    },
+    {
+        "name": "[HUN] Pest Chillout FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/p7brdtt9417uv"
+    },
+    {
+        "name": "[HUN] Peters_stream [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/y2ty1tak0hhvv"
+    },
+    {
+        "name": "[HUN] PHMCRR [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/muxgi9iflhmuv"
+    },
+    {
+        "name": "[HUN] phonk_808 cowbell [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ben276rnd18uv"
+    },
+    {
+        "name": "[HUN] Pop Erre Jackson [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/rxx6d9fbvv8uv"
+    },
+    {
+        "name": "[HUN] PopMixTheBoss [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/grvzf0w1zp9vv"
+    },
+    {
+        "name": "[HUN] POPPSLAGERRADIO2018 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/9k878t3nyrhvv"
+    },
+    {
+        "name": "[HUN] POPPSLAGERRADIO2025 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/9cpqx5rgrenvv"
+    },
+    {
+        "name": "[HUN] presike0023 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/naoxmfn2wnovv"
+    },
+    {
+        "name": "[HUN] ProSkys Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/14ut4u4esv8uv"
+    },
+    {
+        "name": "[HUN] PWRPLY (Global Top Hits) [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/q0s3rduvhrhvv"
+    },
+    {
+        "name": "[HUN] QuantumDopeBASSHEADS [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/n4wat8wyuk8uv"
+    },
+    {
+        "name": "[HUN] Radio 0 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/g1c5egkwpnfuv"
+    },
+    {
+        "name": "[HUN] Radio 6 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/nw4j3bwlexhuv"
+    },
+    {
+        "name": "[HUN] Radio 23 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/5rvbijbfge4vv"
+    },
+    {
+        "name": "[HUN] RADIO FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/iia2wpewzkxuv"
+    },
+    {
+        "name": "[HUN] Radio SMART [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/k1mxpmmc6nhvv"
+    },
+    {
+        "name": "[HUN] Radio Smart-Strike ( 2022) [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/rq6111xdqchvv"
+    },
+    {
+        "name": "[HUN] Radio VEHU [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/tgmkczphev8uv"
+    },
+    {
+        "name": "[HUN] Radio X GTA [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/li9uqvbsc5puv"
+    },
+    {
+        "name": "[HUN] Radio5 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/fqemoaujtqrvv"
+    },
+    {
+        "name": "[HUN] RadioDani [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/rdv6huebcchvv"
+    },
+    {
+        "name": "[HUN] RadioFM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/yr1yrqff7novv"
+    },
+    {
+        "name": "[HUN] radiolive83 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/wlq2cy9wthhtv"
+    },
+    {
+        "name": "[HUN] Radioricsivagyok. [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/peutb3lct2ltv"
+    },
+    {
+        "name": "[HUN] Raggae [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/20wttkf0m0hvv"
+    },
+    {
+        "name": "[HUN] RaiseMTA Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/1c81iz7xxw5vv"
+    },
+    {
+        "name": "[HUN] Ratchet [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ezzqs5eayf9uv"
+    },
+    {
+        "name": "[HUN] Rather Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/aibvuukyztttv"
+    },
+    {
+        "name": "[HUN] RatherMTA - Gipsy [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/kcmvlzbsmbxuv"
+    },
+    {
+        "name": "[HUN] RatherMTA - Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/6jqmilvqlhtuv"
+    },
+    {
+        "name": "[HUN] RatherMTA - Techno [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/jvd1jaoyhwouv"
+    },
+    {
+        "name": "[HUN] RebiDallamok [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/62h0uvybrchvv"
+    },
+    {
+        "name": "[HUN] Red Jade [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/jca0xowiqiouv"
+    },
+    {
+        "name": "[HUN] Retro-Klubb [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/qdv818aeuypvv"
+    },
+    {
+        "name": "[HUN] Rewind FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/pfn80sm3238uv"
+    },
+    {
+        "name": "[HUN] Rewind FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/udvtbum3238uv"
+    },
+    {
+        "name": "[HUN] Rewind FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream-148.zeno.fm/udvtbum3238uv?zs=xUfBrrKVT3uIXGu0acAC8Q"
+    },
+    {
+        "name": "[HUN] Ricsi FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/piimzl3stvbvv"
+    },
+    {
+        "name": "[HUN] Rife 2023 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/febses3ah28tv"
+    },
+    {
+        "name": "[HUN] Rip radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/0urqrba27betv"
+    },
+    {
+        "name": "[HUN] RM Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/tzgghte3ekhvv"
+    },
+    {
+        "name": "[HUN] Rock Box Radio HU [Zeno!][☠ROCK☠]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream-150.zeno.fm/vfcxcmll8jatv"
+    },
+    {
+        "name": "[HUN] Rock Rádió [Zeno!][☠ROCK☠]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/lcp0uklvvj0uv"
+    },
+    {
+        "name": "[HUN] Rock4EVER [Zeno!][☠ROCK☠]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/x2knwa2knchvv"
+    },
+    {
+        "name": "[HUN] rocker [Zeno!][☠ROCK☠]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/6q8iunkqykzuv"
+    },
+    {
+        "name": "[HUN] RockNet Hungary [Zeno!][☠ROCK☠]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/15y4kn442rhvv"
+    },
+    {
+        "name": "[HUN] RockNet Rádió [Zeno!][☠ROCK☠]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream-148.zeno.fm/0ucrqn442rhvv?zs=PSQWdtTsSoSJibQxFvWTZg"
+    },
+    {
+        "name": "[HUN] Rockstar FM [Zeno!][☠ROCK☠]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/pga5q7kdd78uv"
+    },
+    {
+        "name": "[HUN] Ropogos coro [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/w1t554wjhk1uv"
+    },
+    {
+        "name": "[HUN] roraland [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/yxamsd5x0nhvv"
+    },
+    {
+        "name": "[HUN] RTT Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/sir3merpxw6vv"
+    },
+    {
+        "name": "[HUN] Rust FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/sf84738psuhvv"
+    },
+    {
+        "name": "[HUN] Rádió 100 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/lmno7dicl34tv"
+    },
+    {
+        "name": "[HUN] Rádió 100.hu [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/vnn3ytjntvpvv"
+    },
+    {
+        "name": "[HUN] régi melódiák [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/8easu3sgtaduv"
+    },
+    {
+        "name": "[HUN] sadeded [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/c9ferhtmsv8uv"
+    },
+    {
+        "name": "[HUN] Sadies Y2K playlist [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/kxp4m1xtxchvv"
+    },
+    {
+        "name": "[HUN] Saezinc [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/xj4qm9ah5krvv"
+    },
+    {
+        "name": "[HUN] Sajatom [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/voz4ibtrgtqtv"
+    },
+    {
+        "name": "[HUN] Sajt Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/yuf4u75gy38uv"
+    },
+    {
+        "name": "[HUN] SAS Roleplay [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/d7onljz15ypuv"
+    },
+    {
+        "name": "[HUN] SB Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/l4o6094rja0vv"
+    },
+    {
+        "name": "[HUN] SeeNews [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/09t9pyomkgbvv"
+    },
+    {
+        "name": "[HUN] SJR Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/l3mjafuey7vuv"
+    },
+    {
+        "name": "[HUN] Slager Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/b07uja9l2gktv"
+    },
+    {
+        "name": "[HUN] Sláger Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/cq2mkwcc4v8uv"
+    },
+    {
+        "name": "[HUN] Soundtrack [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/8yud6pw5srhvv"
+    },
+    {
+        "name": "[HUN] sourcerp [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/omrplbkemeytv"
+    },
+    {
+        "name": "[HUN] SpikeFM - Retro [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/u9y5z9k4kv8uv"
+    },
+    {
+        "name": "[HUN] SpikeFM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/de8set76hv8uv"
+    },
+    {
+        "name": "[HUN] StayMTA - Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/cy023euucrnvv"
+    },
+    {
+        "name": "[HUN] StrongMTA [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/p9dwv0xx5e2uv"
+    },
+    {
+        "name": "[HUN] SufniRadio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/c0f0muvbrm0uv"
+    },
+    {
+        "name": "[HUN] SufniRadio02 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/75gd5vydx22uv"
+    },
+    {
+        "name": "[HUN] sukarcsavo [Zeno!] [📻Mulatós📻]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/dfm01t01zf8uv"
+    },
+    {
+        "name": "[HUN] SummerfallFM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream-154.zeno.fm/tbu2yh1s6s8uv"
+    },
+    {
+        "name": "[HUN] Super Dance [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/zjsj8i649vvvv"
+    },
+    {
+        "name": "[HUN] Szabadlét Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/1devygt8qxhvv"
+    },
+    {
+        "name": "[HUN] Szeghalom FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/eswhwwutkrhvv"
+    },
+    {
+        "name": "[HUN] Szekely Magyar Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ap6uf8c3708uv"
+    },
+    {
+        "name": "[HUN] Szentgrót Music Pub [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ywk2mpsz1ehvv"
+    },
+    {
+        "name": "[HUN] Sziahello [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/idchllsopjuvv"
+    },
+    {
+        "name": "[HUN] Szivárvány FM 2 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/f2mtcxeb9hatv"
+    },
+    {
+        "name": "[HUN] Szivárvány HIT FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/l3utaa3d6fxuv"
+    },
+    {
+        "name": "[HUN] sárrét 1 radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/8qe473nzmv8uv"
+    },
+    {
+        "name": "[HUN] T.Matthew Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/5k96ve9xqnhvv"
+    },
+    {
+        "name": "[HUN] Tami Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/9bgtp0xu438uv"
+    },
+    {
+        "name": "[HUN] TC Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ewsds4nq01zuv"
+    },
+    {
+        "name": "[HUN] Techno Rave [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/tyk49yrdn48uv"
+    },
+    {
+        "name": "[HUN] Techno STATION [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/1y58y053wv8uv"
+    },
+    {
+        "name": "[HUN] TelboyRadio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/761hdm9yz08uv"
+    },
+    {
+        "name": "[HUN] Tequi-la-la RP [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/fe1cgmdcqrhvv"
+    },
+    {
+        "name": "[HUN] Tequilala [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/337zgau0uchvv"
+    },
+    {
+        "name": "[HUN] test radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/sx9b2cbnvxquv"
+    },
+    {
+        "name": "[HUN] Test Server [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/uu1pawqwm18uv"
+    },
+    {
+        "name": "[HUN] Teszt radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/79kpn3x0wc9uv"
+    },
+    {
+        "name": "[HUN] TesztElek [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/sfw9vj2cxpktv"
+    },
+    {
+        "name": "[HUN] The AnderFM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/mkfhhca2708uv"
+    },
+    {
+        "name": "[HUN] The Jungle Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/uv6n4z5eqrhvv"
+    },
+    {
+        "name": "[HUN] The Summer Vibes Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/sfsbq5tdv2vvv"
+    },
+    {
+        "name": "[HUN] The.Massive.Tomatoes Top 100 rock [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/5r0s23mkffhvv"
+    },
+    {
+        "name": "[HUN] The_Massive_Tomatoes [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/rr0x21wtdfhvv"
+    },
+    {
+        "name": "[HUN] TheGreenHouseRadio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/t473r547rrhvv"
+    },
+    {
+        "name": "[HUN] thenandnow [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/idxrcycbuattv"
+    },
+    {
+        "name": "[HUN] Tisza FM Music [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/nmjk0d3o7eyvv"
+    },
+    {
+        "name": "[HUN] Tisza FM world [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/top6ffxg7hivv"
+    },
+    {
+        "name": "[HUN] Tisza FM Plusz [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/yykhkgmopizuv"
+    },
+    {
+        "name": "[HUN] Treycafe-FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/etjfxilbn4kvv"
+    },
+    {
+        "name": "[HUN] Trust Roleplay fm [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/itbt02vdckltv"
+    },
+    {
+        "name": "[HUN] TuttiFm  igazi [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/tvwzeh0rruhvv"
+    },
+    {
+        "name": "[HUN] TwerkFM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/smngrfwjefkvv"
+    },
+    {
+        "name": "[HUN] uborkatolvaj [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/gmwcthen7sdtv"
+    },
+    {
+        "name": "[HUN] Ujj2023zenek [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/sugwvsmuhv2tv"
+    },
+    {
+        "name": "[HUN] Underground FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/bvq2abapyhhvv"
+    },
+    {
+        "name": "[HUN] Up and Down Disco radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/157pmcff4nhvv"
+    },
+    {
+        "name": "[HUN] Uptempo Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/wfyzqo2zrfhtv"
+    },
+    {
+        "name": "[HUN] UZ Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/yh384dc8lcauv"
+    },
+    {
+        "name": "[HUN] VajdasagiRadio1 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/2vvzhyo9gdsvv"
+    },
+    {
+        "name": "[HUN] Valogatasok brunk spacc gwm kkevin [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/nh9n8tgszt4vv"
+    },
+    {
+        "name": "[HUN] VapeWorld Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/5wgd6cvt2nhvv"
+    },
+    {
+        "name": "[HUN] Venturas NEWS OFFLINE [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/lewykn9sl7zuv"
+    },
+    {
+        "name": "[HUN] VibeWaveRadio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/8dny2lvs0epuv"
+    },
+    {
+        "name": "[HUN] VilsonFM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/skrwp1f6nf9uv"
+    },
+    {
+        "name": "[HUN] Vorostigrisradio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/y3yr426xn0hvv"
+    },
+    {
+        "name": "[HUN] VZS Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/lirkt4fhy2suv"
+    },
+    {
+        "name": "[HUN] WalkerVs Lab [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/wmbxp2450xhvv"
+    },
+    {
+        "name": "[HUN] wedding [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/jkc5lpj4pqlvv"
+    },
+    {
+        "name": "[HUN] West Coast Classics Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/v3aytqbpdiwvv"
+    },
+    {
+        "name": "[HUN] Wicked Westside [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/mm3r4ybsgopuv"
+    },
+    {
+        "name": "[HUN] witeangel1  radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/jwc7sczbeo5vv"
+    },
+    {
+        "name": "[HUN] WizzCast [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/qn4rnmyytxhvv"
+    },
+    {
+        "name": "[HUN] Woffi FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/4tmfxcazhbdtv"
+    },
+    {
+        "name": "[HUN] Wondera [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/rbs5d2443k0uv"
+    },
+    {
+        "name": "[HUN] Wonderfull Dayz Radio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/b3nkpc03afhvv"
+    },
+    {
+        "name": "[HUN] xath.hu [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/qnztc901mg8uv"
+    },
+    {
+        "name": "[HUN] Xelosz [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/6nnbxeqv3jluv"
+    },
+    {
+        "name": "[HUN] Xenon csapata [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/vfeewgqlhyavv"
+    },
+    {
+        "name": "[HUN] xenon new style [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/1edlvmacnjetv"
+    },
+    {
+        "name": "[HUN] Xenoradio [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/775n0r44b48uv"
+    },
+    {
+        "name": "[HUN] Y2K Galaxy [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/00g9rmpm7e9uv"
+    },
+    {
+        "name": "[HUN] you mom [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/gwynchmf6ehvv"
+    },
+    {
+        "name": "[HUN] Zen Buddhista egyesület [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/wbt6eurraxftv"
+    },
+    {
+        "name": "[HUN] Zene112233 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/eaqih40kntrtv"
+    },
+    {
+        "name": "[HUN] Zenebajnok [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/qqbce3skys8uv"
+    },
+    {
+        "name": "[HUN] ZeneRadioChat [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/6qgv4ucl4wttv"
+    },
+    {
+        "name": "[HUN] Zenesziget online rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/8y7sqitobbyuv"
+    },
+    {
+        "name": "[HUN] ZeneZene [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/u4oj57d85natv"
+    },
+    {
+        "name": "[HUN] ZLATI FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/2b65bsfh0hhvv"
+    },
+    {
+        "name": "[HUN] Zsiraf FM [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/de9w2e2kwtfvv"
+    },
+    {
+        "name": "[HUN] Ádi Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/fnana174k0hvv"
+    },
+    {
+        "name": "[HUN] Átlag felett rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/vxbjf6qi7yltv"
+    },
+    {
+        "name": "[HUN] Életfa Rádió [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/6etgv4y41xhvv"
+    },
+    {
+        "name": "[HUN] Hungarian Radio Ukraine Zeno]",
+        "logo": "flogos/zeno.png",
+        "url": "https://stream.zeno.fm/6cdovsomtoruv"
+    },
+    {
+        "name": "[???] Clasic Radio Hindi [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/zewahanyfjptv"
+    },
+    {
+        "name": "[???] Comadreando Con La Lore [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/m9lfpbnpbfgvv"
+    },
+    {
+        "name": "[???] Kenjis Japanese shitstation [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/ejjpmvptz6ivv"
+    },
+    {
+        "name": "[???] Melodias e Momentos [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/wxo4zxfixqgtv"
+    },
+    {
+        "name": "[???] Montonestv 88.3 [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/dn9qxhfksfhvv"
+    },
+    {
+        "name": "[???] old money [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/urewdxqpybavv"
+    },
+    {
+        "name": "[fra???] HYPNOtissimo [Zeno!]",
+        "logo": "logos/zeno.png",
+        "url": "https://stream.zeno.fm/m7rg3ynt9k0uv"
+    },
+    {
+        "name": "[HUN] Danubius [FLAC]",
+        "logo": "logos/danubius.png",
+        "url": "https://stream.danubiusradio.hu/danubius_HiFi"
+    },
+    {
+        "name": "[HUN] Danubius [320k]",
+        "logo": "logos/danubius.png",
+        "url": "https://stream.danubiusradio.hu/danubius_320k"
+    },
+    {
+        "name": "[HUN] Danubius [192k]",
+        "logo": "logos/danubius.png",
+        "url": "https://stream.danubiusradio.hu/danubius_192k"
+    },
+    {
+        "name": "[HUN] Danubius [96k]",
+        "logo": "logos/danubius.png",
+        "url": "https://stream.danubiusradio.hu/danubius_96k"
+    },
+    {
+        "name": "[HUN] Danubius [FLAC]",
+        "logo": "logos/danubius.png",
+        "url": "http://stream.danubiusradio.hu:8091/danubius_HiFi"
+    },
+    {
+        "name": "[HUN] Danubius [320k]",
+        "logo": "logos/danubius.png",
+        "url": "http://stream.danubiusradio.hu:8081/danubius_320k"
+    },
+    {
+        "name": "[HUN] Danubius [192k]",
+        "logo": "logos/danubius.png",
+        "url": "http://stream.danubiusradio.hu:8081/danubius_192k"
+    },
+    {
+        "name": "[HUN] Danubius [128k]",
+        "logo": "logos/danubius.png",
+        "url": "http://stream.danubiusradio.hu:8081/danubius_128k"
+    },
+    {
+        "name": "[HUN] BdpstRock [FLAC]",
+        "logo": "logos/bdpstrock.jpg",
+        "url": "http://s2.audiostream.hu:8091/bdpstrock_FLAC"
+    },
+    {
+        "name": "[HUN] BdpstRock [192k]",
+        "logo": "logos/bdpstrock.jpg",
+        "url": "http://s2.audiostream.hu:8081/bdpstrock_192k"
+    },
+    {
+        "name": "[HUN] BdpstRock [96k]",
+        "logo": "logos/bdpstrock.jpg",
+        "url": "http://s2.audiostream.hu:8081/bdpstrock_96k"
+    },
+    {
+        "name": "[HUN] BdpstRock [FLAC]",
+        "logo": "logos/bdpstrock.jpg",
+        "url": "https://s2.audiostream.hu/bdpstrock_FLAC"
+    },
+    {
+        "name": "[HUN] BdpstRock [320k]",
+        "logo": "logos/bdpstrock.jpg",
+        "url": "https://s2.audiostream.hu/bdpstrock_320k"
+    },
+    {
+        "name": "[HUN] BdpstRock [192k]",
+        "logo": "logos/bdpstrock.jpg",
+        "url": "https://s2.audiostream.hu/bdpstrock_192k"
+    },
+    {
+        "name": "[HUN] BdpstRock [96k]",
+        "logo": "logos/bdpstrock.jpg",
+        "url": "https://s2.audiostream.hu/bdpstrock_96k"
+    },
+    {
+        "name": "[HUN] Youventus [FLAC]",
+        "logo": "logos/youventus.png",
+        "url": "https://s2.audiostream.hu/juventus_FLAC"
+    },
+    {
+        "name": "[HUN] Youventus [320k]",
+        "logo": "logos/youventus.png",
+        "url": "https://s2.audiostream.hu/juventus_320k"
+    },
+    {
+        "name": "[HUN] Youventus [192k]",
+        "logo": "logos/youventus.png",
+        "url": "https://s2.audiostream.hu/juventus_192k"
+    },
+    {
+        "name": "[HUN] Youventus [96k]",
+        "logo": "logos/youventus.png",
+        "url": "https://s2.audiostream.hu/juventus_96k"
+    },
+    {
+        "name": "[HUN] Youventus [320k]",
+        "logo": "logos/youventus.png",
+        "url": "http://s2.audiostream.hu:8080/juventus_320k"
+    },
+    {
+        "name": "[HUN] Youventus [192k]",
+        "logo": "logos/youventus.png",
+        "url": "http://s2.audiostream.hu:8080/juventus_192k"
+    },
+    {
+        "name": "[HUN] Youventus [96k]",
+        "logo": "logos/youventus.png",
+        "url": "http://s2.audiostream.hu:8080/juventus_96k"
+    },
+    {
+        "name": "[HUN] Roxy [FLAC]",
+        "logo": "logos/roxy.png",
+        "url": "https://s2.audiostream.hu/roxy_FLAC"
+    },
+    {
+        "name": "[HUN] Roxy [320k]",
+        "logo": "logos/roxy.png",
+        "url": "https://s2.audiostream.hu/roxy_320k"
+    },
+    {
+        "name": "[HUN] Roxy [192k]",
+        "logo": "logos/roxy.png",
+        "url": "https://s2.audiostream.hu/roxy_192k"
+    },
+    {
+        "name": "[HUN] Roxy [96k]",
+        "logo": "logos/roxy.png",
+        "url": "https://s2.audiostream.hu/roxy_96k"
+    },
+    {
+        "name": "[HUN] Roxy [FLAC]",
+        "logo": "logos/roxy.png",
+        "url": "http://s2.audiostream.hu:8102/roxy_FLAC"
+    },
+    {
+        "name": "[HUN] Roxy [320k]",
+        "logo": "logos/roxy.png",
+        "url": "http://s2.audiostream.hu:8083/roxy_320k"
+    },
+    {
+        "name": "[HUN] Roxy [192k]",
+        "logo": "logos/roxy.png",
+        "url": "http://s2.audiostream.hu:8083/roxy_192k"
+    },
+    {
+        "name": "[HUN] Roxy [96k]",
+        "logo": "logos/roxy.png",
+        "url": "http://s2.audiostream.hu:8083/roxy_96k"
+    }
+];
+
+
+    const listContainer = document.getElementById('stationList');
+    const searchInput = document.getElementById('searchInput');
+    const statsDiv = document.getElementById('stats');
+    const player = document.getElementById('audioPlayer');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    let filteredStations = [...stations];
+
+    function renderList(filter = "", append = false) {
+        if (!append) {
+            listContainer.innerHTML = "";
+            filteredStations = stations.filter(s => s.name.toLowerCase().includes(filter.toLowerCase()));
+            statsDiv.innerText = `${filteredStations.length.toLocaleString()} / ${stations.length.toLocaleString()} adó`;
+        }
+        const start = append ? listContainer.children.length : 0;
+        const chunk = filteredStations.slice(start, start + 80);
+
+        chunk.forEach(s => {
+            const div = document.createElement('div');
+            div.className = 'item';
+            let logoSrc = s.logo.startsWith('http') ? s.logo : './' + s.logo;
+            div.innerHTML = `<img src="${logoSrc}" loading="lazy" onerror="this.src='https://via.placeholder.com/50?text=R'"> <span>${s.name}</span>`;
+            
+            div.onclick = (e) => {
+                document.querySelectorAll('.item').forEach(i => i.classList.remove('active'));
+                div.classList.add('active');
+                player.src = s.url;
+                player.play().catch(() => {});
+                document.getElementById('mainLogo').src = logoSrc;
+                document.getElementById('mainTitle').innerText = s.name;
+                
+                div.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                if(window.innerWidth < 850 && e.isTrusted) {
+                    window.scrollTo({top: 0, behavior: 'smooth'});
+                }
+            };
+            listContainer.appendChild(div);
+        });
+    }
+
+    function togglePlay() { if (player.src) player.paused ? player.play() : player.pause(); }
+    function changeVolume(val) { player.volume = val; }
+    function nextStation() {
+        const active = document.querySelector('.item.active');
+        if (active && active.nextElementSibling) active.nextElementSibling.click();
+        else if (!active && listContainer.firstChild) listContainer.firstChild.click();
+    }
+    function prevStation() {
+        const active = document.querySelector('.item.active');
+        if (active && active.previousElementSibling) active.previousElementSibling.click();
+    }
+
+    let searchTimeout;
+    searchInput.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => renderList(e.target.value), 300);
+    });
+
+    window.addEventListener('keydown', (e) => {
+        if (document.activeElement === searchInput) return;
+        if(e.code === 'Space') { e.preventDefault(); togglePlay(); }
+        if(e.code === 'ArrowRight' || e.code === 'ArrowDown') { e.preventDefault(); nextStation(); }
+        if(e.code === 'ArrowLeft' || e.code === 'ArrowUp') { e.preventDefault(); prevStation(); }
+    });
+
+    player.onplay = () => playPauseBtn.innerText = "⏸";
+    player.onpause = () => playPauseBtn.innerText = "▶";
+
+    function handleScroll() {
+        if (listContainer.scrollTop + listContainer.clientHeight >= listContainer.scrollHeight - 800) {
+            if (listContainer.children.length < filteredStations.length) renderList(searchInput.value, true);
+        }
+        document.getElementById('scrollTopBtn').style.display = listContainer.scrollTop > 800 ? "block" : "none";
+    }
+
+    listContainer.addEventListener('scroll', handleScroll);
+    document.getElementById('scrollTopBtn').onclick = () => listContainer.scrollTo({top:0, behavior:'smooth'});
+
+    setInterval(() => {
+        document.getElementById('digitalClock').innerText = new Date().toTimeString().split(' ')[0];
+    }, 1000);
+
+    renderList();
+</script>
+</body>
+</html>
